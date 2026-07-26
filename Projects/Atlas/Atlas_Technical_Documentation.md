@@ -74,9 +74,9 @@ Current stack:
 
 # 5. AI Provider
 
-Current provider: **Kie.ai**
+Default provider: **Kie.ai** (`Atlas-Kie Adapter Core`), kept as default since it's been the stable one since day one.
 
-Reason: OpenRouter blocks requests from Russian IP addresses (see §6).
+As of 2026-07-27, **OpenRouter is also a fully working, validated alternative** (`Atlas-OpenRouter Adapter Core`, see §22) — the VPS owner set up routing that lifted the earlier geo-block (§6). Switching providers is a one-field change in the main pipeline's `Execute Workflow` node, no other changes needed.
 
 ---
 
@@ -104,9 +104,11 @@ Region: Moscow
 
 Conclusion: traffic blocked because the server IP belongs to Russia. This is an IP-level block by OpenRouter, **not** a credential/authentication configuration problem — reconfiguring the n8n credential does not fix it.
 
-Decision: pause OpenRouter integration. Possible future solution: route traffic through VPN.
+Decision (original): pause OpenRouter integration. Possible future solution: route traffic through VPN.
 
-Note: an OpenRouter API key was hardcoded in plaintext in an unrelated n8n workflow ("My workflow") and in a local file (`Openrouter Atlas API.txt`) during earlier experiments. Harmless while OpenRouter blocks this IP, but should still be rotated since it's been exposed in multiple plaintext locations.
+**Update (2026-07-27): resolved.** The VPS owner set up routing; `/api/v1/chat/completions` now returns real completions instead of `403`, even though `curl https://ipinfo.io` from the same server still reports the same Russian IP — whatever changed is at the network/routing layer, not a new IP. OpenRouter is now fully usable; see §22 for the working adapter.
+
+Note: the original OpenRouter API key had been hardcoded in plaintext in an unrelated n8n workflow ("My workflow") and in a local file (`Openrouter Atlas API.txt`) during earlier experiments. Since OpenRouter is now actually usable (making a leaked key an active risk, not just a theoretical one), **this key was rotated 2026-07-27** — the new key lives only in the n8n credential `atlas openrouter account` and in a KeePassXC vault (`atlas-secrets.kdbx`), not in any plaintext file. The old "My workflow" test workflow still contains the *old, now-revoked* key and can be cleaned up/deleted whenever convenient.
 
 ---
 
@@ -306,11 +308,13 @@ Completed:
 - ✅ `system_prompt` wired into the actual HTTP request body (§8).
 
 - ✅ **Adapter abstraction** — `Atlas-Kie Adapter Core` extracted as a reusable sub-workflow, called via `Execute Workflow` (§21). Verified end-to-end, e.g. `Projects/Atlas/logs/20260727-004050.md`.
+- ✅ **OpenRouter unblocked and adapter built** — `Atlas-OpenRouter Adapter Core` implements the same contract, verified end-to-end (§22). Proves the adapter abstraction actually works for swapping providers, not just in theory.
+- ✅ Old exposed OpenRouter key rotated; new key stored only in n8n credential + KeePassXC vault, not in plaintext files.
 
 Pending:
 
-- ⬜ Implement additional providers as new sub-workflows using the same contract (OpenRouter — blocked on VPN; Claude; OpenAI).
-- ⬜ Rotate exposed OpenRouter API key.
+- ⬜ Implement additional providers as new sub-workflows using the same contract (Claude; OpenAI).
+- ⬜ Make the main pipeline's provider choice dynamic (currently a manual swap of the `Execute Workflow` node's target; a `provider` field + expression-based routing would let this be chosen per-run instead).
 
 ---
 
@@ -402,4 +406,38 @@ Gotchas hit while wiring this up (for next time / next adapter):
 - After defining the sub-workflow's schema, the caller node needs to be reopened for the new fields to appear for mapping (stale cache).
 - Both the main workflow and the sub-workflow need to be **Active** independently for the production form URL to work — editing/restructuring a workflow can silently flip it back to inactive.
 
-**To add a new provider adapter** (OpenRouter/Claude/OpenAI): create a new sub-workflow implementing the same input/output contract, then either swap which workflow the `Execute Workflow` node points to, or (future work) make the target dynamic based on a `provider` field.
+**To add a new provider adapter** (Claude/OpenAI): create a new sub-workflow implementing the same input/output contract, then either swap which workflow the `Execute Workflow` node points to, or (future work) make the target dynamic based on a `provider` field.
+
+---
+
+# 22. Atlas-OpenRouter Adapter Core — DONE (2026-07-27)
+
+Second adapter, built to validate that §21's abstraction actually works for swapping providers (it does — no changes needed to the form, `Edit Fields`, `Convert to File`, or the GitHub commit node).
+
+**`Atlas-OpenRouter Adapter Core`** (workflow id `FCHKR5wwDT1ZYdKu`), same contract as Kie:
+```
+When Executed by Another Workflow (Workflow Input Schema: user_input, system_prompt)
+  → HTTP Request (OpenRouter, predefined credential type)
+  → Code in JavaScript (same normalization as the Kie adapter)
+```
+
+HTTP Request config, differences from the Kie adapter worth noting:
+- **URL**: `https://openrouter.ai/api/v1/chat/completions` (model is NOT in the URL path, unlike Kie).
+- **Authentication**: `Predefined Credential Type` → **OpenRouter** (n8n has native `openRouterApi` credential support), credential `atlas openrouter account` — cleaner than Kie's manual Generic Credential Type → Bearer Auth, since n8n handles the header itself.
+- **Body**: `model` must be an explicit field (used `openai/gpt-4o-mini` for testing), and `content` is a **plain string** (`{{ JSON.stringify(...) }}`), not the `[{type:"text", text:...}]` array shape Kie's API required:
+```json
+={
+  "model": "openai/gpt-4o-mini",
+  "messages": [
+    { "role": "system", "content": {{ JSON.stringify($json.system_prompt) }} },
+    { "role": "user", "content": {{ JSON.stringify($json.user_input) }} }
+  ],
+  "stream": false
+}
+```
+
+Testing gotcha: running the trigger node standalone with **no mock data configured** outputs `{user_input: null, system_prompt: null}`, which isn't obviously wrong (`JSON.stringify(null)` → the string `"null"`, still syntactically valid JSON) — the actual "JSON Body field is not valid JSON" error that showed up was diagnosed by checking the trigger node's own `Execute step` output first, but ultimately the simplest reliable test was: temporarily point the main pipeline's `Execute Workflow` node at this adapter and submit the real form, exactly like testing any other adapter — not worth fighting with isolated mock-data execution.
+
+Verified end-to-end with a real form submission → real `gpt-4o-mini` response → committed to GitHub (`Projects/Atlas/logs/20260727-015206.md`). Main pipeline switched back to `Atlas-Kie Adapter Core` as the default afterward (§5).
+
+Cleanup note: an old, unrelated credential `OpenRouter Main` (type `openAiApi`) predates this work (from an earlier session with ChatGPT, before the IP block was understood) and duplicated the same key — removed in favor of the single `atlas openrouter account` credential to avoid the same secret living in two places.

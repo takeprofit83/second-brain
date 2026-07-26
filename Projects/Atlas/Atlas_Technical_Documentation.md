@@ -305,11 +305,11 @@ Completed:
 - ✅ **Atlas - Docs Sync webhook** — agent-agnostic doc persistence (§20).
 - ✅ `system_prompt` wired into the actual HTTP request body (§8).
 
+- ✅ **Adapter abstraction** — `Atlas-Kie Adapter Core` extracted as a reusable sub-workflow, called via `Execute Workflow` (§21). Verified end-to-end, e.g. `Projects/Atlas/logs/20260727-004050.md`.
+
 Pending:
 
-- ⬜ Build Atlas-Kie adapter (formalize the working workflow into a reusable adapter interface, e.g. a callable sub-workflow).
-- ⬜ Create adapter abstraction (standard interface all adapters implement).
-- ⬜ Implement additional providers (OpenRouter — blocked on VPN; Claude; OpenAI).
+- ⬜ Implement additional providers as new sub-workflows using the same contract (OpenRouter — blocked on VPN; Claude; OpenAI).
 - ⬜ Rotate exposed OpenRouter API key.
 
 ---
@@ -365,3 +365,41 @@ Body: {
 Note: the GitHub node's `edit` operation replaces the whole file content — callers must send the complete new file, not a diff. Only works for files that already exist in the repo (use the `Atlas - Kie Adapter` workflow's own `Create a file` node pattern for brand-new files, e.g. conversation logs).
 
 Status: verified working end-to-end 2026-07-27 — this very section was written to the repo through this webhook, not through a manual `git push`.
+
+---
+
+# 21. Adapter Abstraction — DONE (2026-07-27)
+
+Problem: `Atlas - Kie Adapter` was a single monolithic workflow (form → HTTP call → parse → save/commit). Adding OpenRouter/Claude/OpenAI would have meant copy-pasting the whole thing each time.
+
+Solution: split provider-specific logic into its own reusable sub-workflow, called via n8n's `Execute Workflow` node.
+
+**Contract** (input → output, provider-agnostic):
+```
+in:  { user_input: string, system_prompt: string }
+out: { question, system_prompt, answer, model, tokens, cost, created_at }
+```
+
+**`Atlas-Kie Adapter Core`** (workflow id `7xFzsr8lAy5q51CH`) implements this contract for Kie.ai:
+```
+When Executed by Another Workflow (Workflow Input Schema: user_input, system_prompt)
+  → HTTP Request (Kie.ai, same config as before)
+  → Code in JavaScript (normalizes response; reads original input via
+     $('When Executed by Another Workflow').first().json, since the HTTP
+     response node overwrites $json)
+```
+
+**`Atlas - Kie Adapter`** (main pipeline, workflow id `ls5hJoxIFtUycpKH`) now only orchestrates:
+```
+On form submission → Edit Fields → Call 'Atlas-Kie Adapter Core' (Execute Workflow node)
+  → Convert to File → Read/Write Files from Disk
+  → Create a file (GitHub)
+```
+
+Gotchas hit while wiring this up (for next time / next adapter):
+- The `Execute Workflow` (caller) node has no field-mapping UI at all until the **target sub-workflow's trigger** has a defined `Workflow Input Schema` — until then it just shows "The sub-workflow isn't set up to accept any inputs."
+- Input Data Mode on `When Executed by Another Workflow` must be switched to "Define using fields below" and each field added explicitly (`user_input`, `system_prompt`, type String) — there was no simpler "accept everything" toggle in this n8n version.
+- After defining the sub-workflow's schema, the caller node needs to be reopened for the new fields to appear for mapping (stale cache).
+- Both the main workflow and the sub-workflow need to be **Active** independently for the production form URL to work — editing/restructuring a workflow can silently flip it back to inactive.
+
+**To add a new provider adapter** (OpenRouter/Claude/OpenAI): create a new sub-workflow implementing the same input/output contract, then either swap which workflow the `Execute Workflow` node points to, or (future work) make the target dynamic based on a `provider` field.

@@ -316,18 +316,16 @@ Project owner preferences:
 
 ---
 
-# 19. Next Milestone
+# 19. Next Milestone — COMPLETE (2026-07-27)
 
-Complete persistent logging — **mostly done**; remaining work is just switching the target path.
+Full pipeline is live: **n8n Form → Kie.ai (Gemini, conspecting system prompt) → JS parser → GitHub commit**, zero manual steps between pasting text and a committed file in `second-brain`.
 
-Success criteria: every completed AI request automatically creates
+Final wiring:
 
-```
-/home/node/files/YYYYMMDD-HHMMSS.md
-```
+- Trigger: `On form submission` (n8n Form node), field `Переписка` (Textarea).
+- `Edit Fields`: `user_input` = `{{ $json['Переписка'] }}`, `system_prompt` = static conspecting prompt (see §8).
+- `HTTP Request` JSON body uses `{{ JSON.stringify($json.system_prompt) }}` / `{{ JSON.stringify($json.user_input) }}` (not raw `"{{ ... }}"` inside manual quotes) — required because real pasted conversation text contains quotes/newlines that break hand-written JSON string interpolation otherwise. Fixed 2026-07-27 after hitting `"JSON Body" field is not valid JSON`.
+- Output branches from `Code in JavaScript`: (a) `Convert to File` → `Read/Write Files from Disk` (local copy, static filename `test.md` — not yet timestamped, low priority), (b) `Create a file` (GitHub node) → commits to `Projects/Atlas/logs/{yyyyLLdd-HHmmss}.md` in `second-brain`.
+- Verified end-to-end with real pasted text producing a real structured conspect, e.g. `Projects/Atlas/logs/20260727-000057.md`.
 
-(corrected from the original `/opt/atlas/logs/...` target, which is not reachable from inside the container — see §13)
-
-without manual intervention (currently the filename is a static `test.md`; needs an expression to timestamp it per run).
-
-After that: begin implementation of the first production-ready Atlas Adapter (formal interface, not just a working workflow).
+Next: begin implementation of the first production-ready Atlas Adapter abstraction (formal interface other providers can plug into) — this workflow is currently a concrete instance, not yet a reusable adapter contract.

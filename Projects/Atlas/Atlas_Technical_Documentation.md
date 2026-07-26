@@ -329,3 +329,28 @@ Final wiring:
 - Verified end-to-end with real pasted text producing a real structured conspect, e.g. `Projects/Atlas/logs/20260727-000057.md`.
 
 Next: begin implementation of the first production-ready Atlas Adapter abstraction (formal interface other providers can plug into) — this workflow is currently a concrete instance, not yet a reusable adapter contract.
+
+---
+
+# 20. Atlas - Docs Sync (agent-agnostic doc persistence)
+
+Problem: keeping this documentation in sync with the repo previously depended on whichever coding agent (Claude Code, etc.) happened to be in the session remembering to `git add/commit/push` — not a property of Atlas itself, and wouldn't carry over to a different agent/tool.
+
+Solution: a dedicated n8n workflow, **`Atlas - Docs Sync`** (workflow id `B4Z9lptq8i4e9Kur`), exposing a webhook any agent (or script) can call to persist a doc update, independent of which agent is driving it.
+
+Wiring: `Webhook` (POST `/webhook/atlas-docs-sync`, Header Auth) → `Edit a file` (GitHub node, owner `takeprofit83`, repo `second-brain`) → `Respond to Webhook`.
+
+Request contract:
+```json
+POST /webhook/atlas-docs-sync
+Headers: X-Atlas-Secret: <shared secret, stored in n8n credential "atlas docs sync secret">
+Body: {
+  "filePath": "Projects/Atlas/Atlas_Technical_Documentation.md",
+  "content": "<full new file content>",
+  "commitMessage": "docs: ..."
+}
+```
+
+Note: the GitHub node's `edit` operation replaces the whole file content — callers must send the complete new file, not a diff. Only works for files that already exist in the repo (use the `Atlas - Kie Adapter` workflow's own `Create a file` node pattern for brand-new files, e.g. conversation logs).
+
+Status: verified working end-to-end 2026-07-27 — this very section was written to the repo through this webhook, not through a manual `git push`.

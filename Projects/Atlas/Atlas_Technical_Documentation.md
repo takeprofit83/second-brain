@@ -146,15 +146,21 @@ Content-Type: application/json
 }
 ```
 
-**Actual current implementation** (verified live in the `Atlas - Kie Adapter` workflow, node `HTTP Request`):
+**Actual current implementation** (verified live in the `Atlas - Kie Adapter` workflow, node `HTTP Request`, as of 2026-07-27):
 
 ```json
 {
   "messages": [
     {
+      "role": "system",
+      "content": [
+        { "type": "text", "text": {{ JSON.stringify($json.system_prompt) }} }
+      ]
+    },
+    {
       "role": "user",
       "content": [
-        { "type": "text", "text": "{{ $json.user_input }}" }
+        { "type": "text", "text": {{ JSON.stringify($json.user_input) }} }
       ]
     }
   ],
@@ -162,7 +168,9 @@ Content-Type: application/json
 }
 ```
 
-⚠️ **Known gap:** `system_prompt` is set in `Edit Fields` and used later when logging/parsing the answer, but it is **not currently sent to the model** — there's no system-role message in the live HTTP body. `include_thoughts` and multi-message system+user structure from the design intent above were never implemented in the production node. Revisit if system-prompt steering is actually needed.
+Note the `JSON.stringify(...)` (no surrounding quotes in the template) rather than `"{{ ... }}"` — required so real pasted conversation text with quotes/newlines doesn't break the JSON (see §19).
+
+✅ **Resolved (2026-07-27):** `system_prompt` is now actually sent as a real system-role message (see the "Actual current implementation" body above, which already includes it) — this note was stale, kept for history. `include_thoughts` and the flat `content: "string"` shape from the original design-intent draft were never implemented; the production node uses the `content: [{type: "text", text: ...}]` array shape for both roles instead, wrapped in `JSON.stringify(...)` per the fix in §19.
 
 ---
 
@@ -293,12 +301,15 @@ Completed:
 - ✅ **Save markdown to disk** — resolved 2026-07-26/27, writes to `/home/node/files/`.
 - ✅ **Mount persistent logs directory** — `/home/node/files` ↔ `/opt/data/n8n-files` bind mount confirmed persistent.
 
+- ✅ **Form Trigger + real conspect + GitHub auto-commit** — full pipeline complete (§19).
+- ✅ **Atlas - Docs Sync webhook** — agent-agnostic doc persistence (§20).
+- ✅ `system_prompt` wired into the actual HTTP request body (§8).
+
 Pending:
 
 - ⬜ Build Atlas-Kie adapter (formalize the working workflow into a reusable adapter interface, e.g. a callable sub-workflow).
 - ⬜ Create adapter abstraction (standard interface all adapters implement).
 - ⬜ Implement additional providers (OpenRouter — blocked on VPN; Claude; OpenAI).
-- ⬜ Wire `system_prompt` into the actual HTTP request body if system-role steering is wanted (see §8 gap).
 - ⬜ Rotate exposed OpenRouter API key.
 
 ---

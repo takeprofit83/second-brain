@@ -11,8 +11,12 @@
  * ready-made bookmarklet URI.
  */
 (async function () {
-  const WEBHOOK_URL = "https://n8n.neiroclone.ru/webhook/atlas-capture";
-  const WEBHOOK_SECRET = "REPLACE_WITH_YOUR_ATLAS_CAPTURE_SECRET"; // get this from the "atlas capture secret" credential / your KeePassXC vault — never commit the real value
+  // Relay page hosted on a separate small server (outside the main VPS's
+  // reverse proxy, which adds a restrictive CSP `sandbox` header to webhook
+  // responses that would block this page's own fetch() otherwise). The
+  // relay page itself holds the real webhook secret server-side; this
+  // bookmarklet never needs to know it.
+  const RELAY_URL = "REPLACE_WITH_YOUR_RELAY_PAGE_URL"; // e.g. http://<relay-server-ip>/atlas-relay-<random>.html
   const PROVIDER = "Kie"; // or "OpenRouter"
 
   function extractConversationId() {
@@ -81,20 +85,20 @@
       return;
     }
 
-    const resp = await fetch(WEBHOOK_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Atlas-Secret": WEBHOOK_SECRET,
-      },
-      body: JSON.stringify({ text, provider: PROVIDER }),
-    });
-
-    if (resp.ok) {
-      alert(`Atlas: диалог отправлен на конспектирование (${text.length} симв.).`);
-    } else {
-      alert(`Atlas: webhook ответил ошибкой HTTP ${resp.status}.`);
+    const relay = window.open(RELAY_URL, "atlas_relay", "width=420,height=200");
+    if (!relay) {
+      alert("Atlas: браузер заблокировал всплывающее окно — разреши попапы для chatgpt.com и попробуй снова.");
+      return;
     }
+
+    function onMessage(event) {
+      if (event.source !== relay) return;
+      if (event.data && event.data.type === "atlas-ready") {
+        relay.postMessage({ type: "atlas-payload", text, provider: PROVIDER }, "*");
+        window.removeEventListener("message", onMessage);
+      }
+    }
+    window.addEventListener("message", onMessage);
   } catch (err) {
     alert("Atlas: ошибка — " + err.message);
   }

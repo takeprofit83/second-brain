@@ -28,7 +28,9 @@
       credentials: "include",
     });
     if (!res.ok) throw new Error(`Ошибка загрузки диалога: HTTP ${res.status}`);
-    return res.json();
+    const json = await res.json();
+    // Qwen wraps the actual payload one level deeper: {success, request_id, data: {chat: {...}}}
+    return json.data;
   }
 
   function extractText(msg) {

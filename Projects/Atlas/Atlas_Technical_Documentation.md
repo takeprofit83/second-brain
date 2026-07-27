@@ -460,4 +460,58 @@ Defaults to Kie (`7xFzsr8lAy5q51CH`) unless the form explicitly selects OpenRout
 
 Verified: submitted the form once with each provider selection; both executions completed with status `success` and produced valid conspects committed to GitHub (`Projects/Atlas/logs/20260727-020201.md`, `20260727-020235.md`). Note: n8n stores execution data in a compact internal format, not plain JSON, so confirming the exact model used per historical execution via direct DB query isn't practical — routing correctness rests on the simple ternary expression being structurally correct plus each branch having been independently validated earlier (§21, §22), not on inspecting raw execution logs.
 
+---
+
+# 24. ChatGPT Capture Bookmarklet — DONE (2026-07-27)
+
+Goal: this is the piece that actually delivers on "agents themselves take a snapshot of the chat" — one click on a ChatGPT conversation, no manual copy-paste, no fighting the form.
+
+## Ingestion webhook
+
+Added a plain **Webhook** node (POST, path `atlas-capture`, Header Auth via credential `atlas capture secret`) to `Atlas - Kie Adapter`, wired in parallel to `On form submission` → both feed `Edit Fields`, which now reads from whichever source actually fired:
+```
+user_input: {{ $json['Переписка'] || $json.body?.text }}
+provider:   {{ $json['Провайдер'] || $json.body?.provider }}
+```
+This makes the pipeline usable both by a human filling the form and by any script POSTing raw JSON `{text, provider}`.
+
+## The CSP wall (two of them)
+
+Building a bookmarklet that reads a ChatGPT conversation and POSTs it straight to the webhook hit two separate content-security-policy walls, neither fixable client-side:
+
+1. **chatgpt.com's own CSP** blocks `fetch()`/`XHR` to any domain not on its `connect-src` allowlist (confirmed via browser console: `Refused to connect... violates the Content Security Policy`, listing domains like `realtime.chatgpt.com`, `googleapis.com`, etc. — nothing we control). CORS configuration on the receiving server is irrelevant here; this is enforced by the browser based on the *page's* policy.
+2. **The main VPS's own reverse proxy** (Nginx Proxy Manager) adds `Content-Security-Policy: sandbox ...` (without `allow-same-origin`) to every response coming through it, including n8n's `Respond to Webhook` output. A page served this way runs in a sandboxed, opaque-origin context — even a `fetch()` to its own literal domain then counts as cross-origin and can fail. Tried first: MinIO on the same VPS as a static host for a relay page — same proxy, same problem, plus port 9000 turned out to be closed at the cloud-provider firewall level (not fixable via SSH, outside this VM's own OS control).
+
+## Solution: relay page on a separate server
+
+`window.open()` to a different origin is **not** restricted by connect-src CSP (only `fetch`/`XHR`/`WebSocket` are) — so:
+
+```
+Bookmarklet (runs on chatgpt.com)
+  1. fetch /api/auth/session  (same-origin, allowed) → accessToken
+  2. fetch /backend-api/conversation/<id>  (same-origin, allowed) → full message tree
+  3. build plain-text transcript by walking `mapping` from `current_node` back to root
+  4. window.open(relay page URL)
+  5. wait for {type:"atlas-ready"} postMessage from the relay window
+  6. relay.postMessage({type:"atlas-payload", text, provider})
+
+Relay page (hosted on a SEPARATE small VPS, plain nginx, no proxy in front)
+  1. on load, if window.opener exists, postMessage {type:"atlas-ready"} to it
+  2. on receiving {type:"atlas-payload", ...}, fetch() the atlas-capture
+     webhook directly (same-origin-ish, no CSP restriction at all since
+     this server adds no CSP header whatsoever) with the embedded secret
+  3. show status, auto-close after ~2s
+```
+
+New infrastructure: a free-tier VPS from reg.ru ("Tangerine Zirconium", Ubuntu 26.04, 1 vCPU / 1GB RAM / 10GB SSD, 6-month free trial then paid) — deliberately **separate** from the main Atlas VPS specifically to escape its reverse proxy's CSP header and closed firewall ports. Plain `nginx` installed, no reverse proxy, no CSP headers added. SSH access via key auth (`~/.ssh/tangerine_vps`, alias `tangerine-vps` in SSH config), password rotated away from the initial root password after key install.
+
+Relay page filename uses a random hex slug (not a guessable name like `relay.html`) as a lightweight obscurity measure, since the page necessarily embeds the real `atlas-capture` webhook secret in plain sight (client-side JS can't hide a secret from whoever loads the page). Real mitigation is out-of-band: keep provider (Kie.ai/OpenRouter) spending limits low, and rotate the webhook secret if abuse is ever suspected — not security through the filename.
+
+Source lives in `Projects/Atlas/tools/`:
+- `chatgpt-capture-bookmarklet.js` — readable source, `RELAY_URL` is a placeholder (real value never committed).
+- `chatgpt-capture-bookmarklet.README.md` — install/setup instructions, including how to stand up your own relay page.
+- The actual working `javascript:` bookmarklet URI and the relay page's real HTML (with the real secret) are **not committed** — they exist only as local files and on the relay server itself.
+
+Verified end-to-end: clicked the bookmark on a real ChatGPT conversation ("Урок 26 Разбор процесса"), got a real structured conspect committed to `Projects/Atlas/logs/20260727-032743.md` — genuinely one click, zero copy-paste, zero DOM-virtualization fighting.
+
 To add a third provider: build its adapter sub-workflow (same contract), add its name to the form dropdown, and extend the ternary to a proper switch/lookup once there are more than two options.

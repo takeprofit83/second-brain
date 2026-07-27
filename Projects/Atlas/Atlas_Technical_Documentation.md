@@ -311,10 +311,11 @@ Completed:
 - ✅ **OpenRouter unblocked and adapter built** — `Atlas-OpenRouter Adapter Core` implements the same contract, verified end-to-end (§22). Proves the adapter abstraction actually works for swapping providers, not just in theory.
 - ✅ Old exposed OpenRouter key rotated; new key stored only in n8n credential + KeePassXC vault, not in plaintext files.
 
+- ✅ **Dynamic provider routing** — form has a `Провайдер` dropdown (Kie/OpenRouter), routed to the right sub-workflow per-run via an expression on the `Execute Workflow` node (§23). No more manually editing the node to switch providers.
+
 Pending:
 
-- ⬜ Implement additional providers as new sub-workflows using the same contract (Claude; OpenAI).
-- ⬜ Make the main pipeline's provider choice dynamic (currently a manual swap of the `Execute Workflow` node's target; a `provider` field + expression-based routing would let this be chosen per-run instead).
+- ⬜ Implement additional providers as new sub-workflows using the same contract (Claude; OpenAI) — just add them to the dropdown + ternary/switch expression once built.
 
 ---
 
@@ -441,3 +442,22 @@ Testing gotcha: running the trigger node standalone with **no mock data configur
 Verified end-to-end with a real form submission → real `gpt-4o-mini` response → committed to GitHub (`Projects/Atlas/logs/20260727-015206.md`). Main pipeline switched back to `Atlas-Kie Adapter Core` as the default afterward (§5).
 
 Cleanup note: an old, unrelated credential `OpenRouter Main` (type `openAiApi`) predates this work (from an earlier session with ChatGPT, before the IP block was understood) and duplicated the same key — removed in favor of the single `atlas openrouter account` credential to avoid the same secret living in two places.
+
+---
+
+# 23. Dynamic Provider Routing — DONE (2026-07-27)
+
+Problem: switching providers required manually opening the `Execute Workflow` node and changing its target — fine for testing, not for real use where the choice should be made per-submission.
+
+Solution:
+- **`On form submission`**: added a second form field, **`Провайдер`** (Dropdown, options: `Kie`, `OpenRouter`).
+- **`Edit Fields`**: added `provider` = `{{ $json['Провайдер'] }}` (pass-through).
+- **`Call 'Atlas-Kie Adapter Core'`** (the `Execute Workflow` node — name is now slightly stale, still routes to either adapter): the **Workflow** resource locator was switched from `From list` to `By ID`, with an expression instead of a static ID:
+```
+{{ $json.provider === 'OpenRouter' ? 'FCHKR5wwDT1ZYdKu' : '7xFzsr8lAy5q51CH' }}
+```
+Defaults to Kie (`7xFzsr8lAy5q51CH`) unless the form explicitly selects OpenRouter.
+
+Verified: submitted the form once with each provider selection; both executions completed with status `success` and produced valid conspects committed to GitHub (`Projects/Atlas/logs/20260727-020201.md`, `20260727-020235.md`). Note: n8n stores execution data in a compact internal format, not plain JSON, so confirming the exact model used per historical execution via direct DB query isn't practical — routing correctness rests on the simple ternary expression being structurally correct plus each branch having been independently validated earlier (§21, §22), not on inspecting raw execution logs.
+
+To add a third provider: build its adapter sub-workflow (same contract), add its name to the form dropdown, and extend the ternary to a proper switch/lookup once there are more than two options.

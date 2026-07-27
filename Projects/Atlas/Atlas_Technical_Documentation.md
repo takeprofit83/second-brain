@@ -515,3 +515,67 @@ Source lives in `Projects/Atlas/tools/`:
 Verified end-to-end: clicked the bookmark on a real ChatGPT conversation ("Урок 26 Разбор процесса"), got a real structured conspect committed to `Projects/Atlas/logs/20260727-032743.md` — genuinely one click, zero copy-paste, zero DOM-virtualization fighting.
 
 To add a third provider: build its adapter sub-workflow (same contract), add its name to the form dropdown, and extend the ternary to a proper switch/lookup once there are more than two options.
+
+---
+
+# 25. Conspect Purpose Correction — DONE (2026-07-27)
+
+The original `system_prompt` produced a short, human-readable "meeting minutes" style digest (Темы / Решения / Ошибки / Открытые вопросы). User feedback: that's not the point — **the actual goal is a context-handoff document another AI model can use to resume work with zero access to the original conversation**, not a summary for a human to skim.
+
+New `system_prompt` (in `Edit Fields`, `Atlas - Kie Adapter`):
+```
+Ты сохраняешь контекст переписки для передачи другой AI-модели, которая продолжит работу с нуля, без доступа к этой истории переписки. Не делай короткую выжимку для человека.
+
+Сохрани:
+1. Текущее состояние проекта/архитектуры со всеми техническими деталями (конфигурации, ID, пути, версии, конкретные значения).
+2. Все принятые решения и их обоснование (почему выбрано именно так).
+3. Что уже сделано и проверено (работает end-to-end).
+4. Что осталось сделать — конкретный план следующих шагов.
+5. Нерешённые вопросы и известные ограничения.
+
+Пиши подробно. Цель — не компактность, а полнота, достаточная для бесшовного продолжения работы другой моделью без потери контекста.
+```
+Verified: a test conversation about a config-loader module produced a detailed handoff doc with exact file paths, module names, done/todo breakdown, and open questions — the right genre of document.
+
+---
+
+# 26. Chunking / Map-Reduce for Long Conversations — DONE (2026-07-27)
+
+Problem found via real usage: capturing an actual long ChatGPT conversation (634 mapping nodes, 623-message chain, **448,253 characters**) produced a conspect covering only the *beginning* of the conversation — Kie.ai silently truncates oversized input rather than erroring, so a single-call approach caps out around some input size well below what a long-running chat can reach. Confirmed the pipeline itself wasn't corrupting data (a distinctive control-test payload round-tripped correctly) — the truncation happens at/before the provider API.
+
+**Solution: uniform 2-pass map-reduce**, no conditional branching (simpler to build and reason about than an if/else per input size):
+
+```
+Edit Fields
+  → Chunk Input (Code node)
+      - if user_input.length <= 60000: pass through as a single item,
+        system_prompt replaced with a per-chunk "extract everything" prompt,
+        original context-handoff prompt saved as `original_system_prompt`
+      - else: split user_input on "\n\n" message boundaries into ~60k-char
+        chunks (never cutting a message in half), emit one item per chunk,
+        each with its own "this is part N/M, extract facts" system_prompt
+  → Call 'Atlas-Kie Adapter Core' (Execute Workflow, Mode: Run Once for Each Item)
+      - runs once per chunk (or once total if not chunked), each call
+        returns {answer, model, tokens, cost, created_at, ...}
+  → Combine Chunks (Code node, Run Once for All Items)
+      - joins all items' `.answer` fields with "--- Часть N/M ---" headers
+      - pulls `original_system_prompt` and `provider` from $('Chunk Input')
+        by NODE NAME, not from the adapter's output — the adapter's own
+        Code node doesn't pass through caller-supplied extra fields like
+        `provider`/`original_system_prompt`, only its own fixed output shape.
+        Reading them from the adapter's result instead of the chunker
+        produces `undefined`, which breaks the next HTTP call's JSON body
+        (see gotcha below) — this bit us once, fixed by referencing
+        $('Chunk Input').first().json directly.
+  → Call Adapter (Final) (Execute Workflow, same node type/config, second
+      instance) — single item now (Combine Chunks always emits exactly one),
+      runs the ORIGINAL context-handoff system_prompt over the combined
+      partial extracts, producing the final polished document
+  → Convert to File / Create a file (unchanged)
+```
+
+Gotcha (recurrence of an earlier bug class): `JSON.stringify(undefined)` returns the JS value `undefined` (not a string), which breaks hand-written JSON body templates when embedded raw — same root cause as the double-`=` and null-mock-data issues earlier today. Any time a new field is threaded through multiple nodes, check it's actually defined at the point it reaches an HTTP Request's JSON body.
+
+Verified end-to-end with a synthetic ~173,000-character, 400-exchange test conversation (3 chunks): the final conspect correctly referenced content from **the end** of the conversation (item 399) and correctly reconstructed the pattern spanning the whole thing — not just the beginning, unlike the pre-chunking behavior.
+
+Known trade-off: every capture now costs at least 2 LLM calls (map + reduce) even for short inputs, instead of 1 — deliberate simplification to avoid conditional branching in the graph. Also: this duplicates the "how to call each provider" concern across two Execute Workflow node instances calling the same adapter — acceptable since it's still going through the shared adapter sub-workflow, not re-implementing provider-specific HTTP logic.

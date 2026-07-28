@@ -259,6 +259,17 @@ Net result: the "write" side of the original vision (agents capture chat snapsho
 
 ---
 
+# 2026-07-28 — Memory-gap incident: Kie Adapter rework wasn't recorded
+
+A prior session reworked `Atlas - Kie Adapter` collaboratively with the user — the workflow grew new nodes (`On form submission`, `Webhook`, `Chunk Input`, `Combine Chunks`, `Call Adapter (Final)`) beyond the 2026-07-26 snapshot described above. That rework was never written back to memory or this log, so a later Claude Code session (this one) started from the stale 2026-07-26 state and had to re-diagnose via a live DB query (`SELECT ... FROM workflow_entity WHERE id='ls5hJoxIFtUycpKH'`) to discover the two previously-flagged issues no longer applied:
+
+- The leaked OpenRouter key in `My workflow` (`JxejbvdlHffbu5J1`) — user had cleared the workflow entirely (0 nodes), confirmed via DB.
+- The dead debug node `Code in JavaScript1` in `Atlas - Kie Adapter` — no longer present in the node list, confirmed via DB.
+
+This is exactly the failure mode Atlas exists to prevent: work done with one agent/session silently invisible to the next. Lesson for future sessions: when a workflow is reworked in collaboration with the user (not just discovered via DB query), the resulting node list and purpose should be written to memory/this log in the same session, not left for a future session to reconstruct from Postgres.
+
+---
+
 # User Preferences During Development
 
 - Short answers.

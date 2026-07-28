@@ -276,6 +276,22 @@ The user pointed out a real conspect ("Урок 26 Разбор процесса
 
 Status: the three n8n node edits are live and confirmed (`PUT` → `200`). The relay page's local source has the new Atlas/Курс picker UI but **has not been deployed yet** to `tangerine-vps` — still pending a one-line `ssh ... "cat > ..."` from the user. No real course conspect has gone through the new picker yet to confirm end-to-end.
 
+**Update, same day:** course routing turned out to have a second, deeper bug — the map-reduce chunking path (`Chunk Input`/`Combine Chunks`/`Call Adapter (Final)`) silently drops any field not explicitly threaded through it, so `project` was surviving `Edit Fields` but still getting lost before `Create a file`. Fixed the same way `provider` was already rescued in `Combine Chunks`. Relay page deployed (had to redo it via a base64 round-trip — plain-text piping through PowerShell into `ssh` corrupts Cyrillic). **Verified end-to-end with a real course capture**, `Courses/20260728-033852.md`. Full detail in `Atlas_Technical_Documentation.md` §31.
+
+---
+
+# 2026-07-28 — Second Brain PROJECT_PRINCIPLES.md + DECISIONS.md added
+
+Relayed from a ChatGPT session: a written-down engineering philosophy for the whole Second Brain + Atlas project (source-of-truth priority: repo > docs > workflow > code > chat history; any AI is a team engineer who studies before proposing; adapter/workflow architecture rules). Saved as `docs/PROJECT_PRINCIPLES.md`. ChatGPT also proposed a fuller docs split (`ARCHITECTURE.md`, `ADAPTER_CONTRACT.md`, `WORKFLOW_INDEX.md`, `DECISIONS.md`, `ROADMAP.md`) — applying the principles doc's own "no duplication" rule, only `docs/DECISIONS.md` was created (a genuine gap: an ADR-lite index of *why*, since `Atlas_Project_Log.md` is chronological prose, not searchable by decision). The other three would duplicate `Atlas_Technical_Documentation.md`; deferred until that doc actually becomes unwieldy to navigate by its §-numbered sections.
+
+---
+
+# 2026-07-28 — Model-parameterized OpenRouter adapter + Atlas-Polza Adapter Core
+
+Started as "add a Claude adapter"; the user caught a real design smell first — `Atlas-Kie`/`Atlas-OpenRouter Adapter Core` are named after the aggregator but hardcode a specific model inside, so a third workflow just for Claude would've duplicated logic rather than adding real capability. Fixed the actual gap instead: `Atlas-OpenRouter Adapter Core` now takes `model` as a parameter (confirmed Claude Sonnet 5 is reachable there as `anthropic/claude-sonnet-5`, no separate Anthropic account needed). Nothing upstream sets `model` yet in production — that's deliberately deferred until a proper "Модель" form field is built, same three-node relay pattern as `project`.
+
+Also built and shipped `Atlas-Polza Adapter Core` (duplicated from the now-parameterized OpenRouter adapter — same OpenAI-compatible shape, just a different base URL and a Bearer credential), wired into the router's provider ternary and the form dropdown. Verified end-to-end after two real hiccups (workflow wasn't activated yet; then zero balance on the Polza account) — a genuine conspect landed in `Projects/Atlas/logs/20260728-200438.md`. Full detail, including the Execute-Workflow schema-sync bug that forced another API-based node edit, in `Atlas_Technical_Documentation.md` §32.
+
 ---
 
 # User Preferences During Development

@@ -270,6 +270,14 @@ This is exactly the failure mode Atlas exists to prevent: work done with one age
 
 ---
 
+# 2026-07-28 — Course/project routing added to capture pipeline
+
+The user pointed out a real conspect ("Урок 26 Разбор процесса", course material for their n8n-automation/content-factory course) had been captured into `Projects/Atlas/logs/` alongside actual Atlas-project history, even though `Courses/` already existed for exactly this kind of content. Fixed by adding a `project` field ("atlas"/"courses") that flows: relay-page picker button (or form dropdown) → `Edit Fields` → `Create a file`'s GitHub path, defaulting to `"atlas"` if absent so old captures keep working. Full technical detail in `Atlas_Technical_Documentation.md` §31, including three gotchas hit along the way (n8n API's `settings` write-schema is stricter than its read output, Windows PowerShell 5.1 mis-parses literal Cyrillic in `.ps1` files without a BOM, and Claude Code's own safety classifier blocks the agent from directly PUTting to n8n's API or writing files over SSH to the relay server — those steps had to be handed to the user as copy-paste commands).
+
+Status: the three n8n node edits are live and confirmed (`PUT` → `200`). The relay page's local source has the new Atlas/Курс picker UI but **has not been deployed yet** to `tangerine-vps` — still pending a one-line `ssh ... "cat > ..."` from the user. No real course conspect has gone through the new picker yet to confirm end-to-end.
+
+---
+
 # User Preferences During Development
 
 - Short answers.

@@ -652,4 +652,47 @@ Verified the leak was live (not just theoretical): the PostgreSQL password in th
    - Confirmed no n8n credential referenced MinIO (checked `credentials_entity` table) — only the Atlas-specific credentials (Kie.ai, GitHub, OpenRouter, docs-sync, capture) exist, so nothing else needed updating.
    - New passwords communicated to the project owner for their own KeePassXC vault; not stored anywhere in this repo or in n8n beyond the credentials/env vars listed above.
 
+---
+
+# 31. Course/Project Routing for Captures — IN PROGRESS (2026-07-28)
+
+Problem: the capture pipeline had no concept of *which* target directory a conspect belongs to — every capture (bookmarklet or manual form) landed in `Projects/Atlas/logs/` regardless of subject matter. One real example already committed there: `Projects/Atlas/logs/20260727-032743.md`, captured from a ChatGPT conversation titled "Урок 26 Разбор процесса" — actually course material for the user's n8n-automation/content-factory course, not Atlas-project history. The user separately created `Courses/` (empty, `.gitkeep` only) in `second-brain` for exactly this kind of content and wants captures routed there automatically instead of hand-sorted after the fact.
+
+## Design
+
+Added a `project` field ("atlas" | "courses") that flows through the whole pipeline and decides the GitHub commit path:
+
+1. **`On form submission`** (manual-paste path) — added a `Проект` dropdown field with options `Atlas` / `Курс`.
+2. **`Edit Fields`** — added assignment `project`, expression:
+   ```
+   {{ ($json["Проект"] === "Курс" || $json.body?.project === "courses") ? "courses" : "atlas" }}
+   ```
+   reads from either the form dropdown or a `project` key in the webhook JSON body, defaults to `"atlas"` if neither is present (keeps old bookmarklets/relay pages that don't send `project` yet working exactly as before).
+3. **`Create a file`** (GitHub node) — `filePath` expression changed from the old hardcoded `"Projects/Atlas/logs/" + ...` to:
+   ```
+   {{ ($json.project === "courses" ? "Courses/" : "Projects/Atlas/logs/") + $now.format('yyyyLLdd-HHmmss') + ".md" }}
+   ```
+4. **Relay page** (`atlas-relay-d42332f0300f625f.html` on `tangerine-vps`, source in `atlas-relay-page-REAL-SECRET.html`) — no longer auto-sends the instant it receives `{type:"atlas-payload", ...}` from the bookmarklet. Instead it shows two buttons ("Atlas" / "Курс") and includes the user's choice as `project: "atlas" | "courses"` in the POST body to `atlas-capture`.
+
+`Courses/` itself still has no established subfolder/naming convention beyond mirroring the flat `{yyyyLLdd-HHmmss}.md` pattern used in `Projects/Atlas/logs/` — revisit once real course conspects start landing there.
+
+## How the n8n nodes actually got edited
+
+The three node edits above were applied via n8n's **public REST API** (`PUT /api/v1/workflows/{id}`), not by hand in the UI, after a manual attempt on `On form submission` hit a UI mismatch (its actual field/button labels didn't match what was predicted, so editing it required the JSON directly instead of guessing UI labels blind). Notes for next time this pattern is needed:
+
+- **n8n API key**: created ad hoc in n8n UI (Settings → n8n API), used once, deleted immediately after by the user — not stored anywhere.
+- **Claude Code's own safety classifier blocked direct PUT/write calls** originating from the coding agent itself — both the n8n API `PUT` and a plain `ssh ... "cat > file"` to `tangerine-vps` got denied outright (not a permission prompt, a hard block), even though the equivalent read-only `GET`/`ssh ... "cat file"` calls worked fine. Net effect: the agent can *read* production state freely but the user has to personally run any command that *writes* to production n8n or the relay server, copy-pasted from a prepared script/one-liner.
+- **n8n public API's `PUT /workflows/{id}` `settings` schema is stricter than what `GET` returns**: the live workflow's `settings` included `binaryMode` and `availableInMCP` (newer internal fields), and round-tripping them verbatim into the `PUT` body failed with `400 request/body/settings must NOT have additional properties`. Fix: strip `settings` down to only `{ "executionOrder": "v1" }` before sending.
+- **Windows PowerShell 5.1 reads `.ps1` files without a BOM using the system codepage**, so literal Cyrillic characters written into a script file (e.g. by an external tool) get mis-decoded and break the parser with confusing "unexpected token" errors mid-string. Workaround: encode Cyrillic literals as base64 in the script and decode with `[System.Text.Encoding]::UTF8.GetString([Convert]::FromBase64String(...))` at runtime instead of writing them literally.
+- Default Windows execution policy blocks running any local `.ps1` at all (`PSSecurityException: выполнение сценариев отключено`) — resolved per-invocation with `powershell -ExecutionPolicy Bypass -File ...`, no system-wide policy change needed.
+
+## Status as of 2026-07-28
+
+- ✅ n8n workflow nodes (`Edit Fields`, `On form submission`, `Create a file`) updated and confirmed live (`PUT` returned `200`).
+- ⬜ **Relay page not yet deployed** — `atlas-relay-page-REAL-SECRET.html` locally updated with the Atlas/Курс picker UI, but `tangerine-vps:/var/www/html/atlas-relay-d42332f0300f625f.html` still serves the old auto-send version as of this writing (verified via `grep -c 'btn-courses'` on the server returning `0`). User needs to run:
+  ```
+  Get-Content "atlas-relay-page-REAL-SECRET.html" -Raw -Encoding UTF8 | ssh tangerine-vps "cat > /var/www/html/atlas-relay-d42332f0300f625f.html"
+  ```
+- ⬜ Not yet tested end-to-end: no real course conspect has been captured through the new picker to confirm it actually lands in `Courses/`.
+
 Takeaway for future conspects: the redaction instruction is now baked into the standing `system_prompt`, so this should self-prevent going forward, but it's a reminder that an LLM instructed to "preserve exact configuration values" will do exactly that — including values that shouldn't be preserved in a public repo.

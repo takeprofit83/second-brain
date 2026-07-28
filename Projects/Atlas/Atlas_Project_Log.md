@@ -1,7 +1,7 @@
 # Atlas Project Log (Reconstructed)
-Version: 0.1
+Version: 0.2
 Status: In Progress
-Last updated: 2026-07-27
+Last updated: 2026-07-28
 
 ---
 
@@ -244,6 +244,18 @@ Planned (not yet created on the server):
 7. Implement OpenAI adapter.
 
 Also outstanding: rotate the OpenRouter API key currently hardcoded in plaintext in the "My workflow" n8n workflow and in `Openrouter Atlas API.txt` (harmless while OpenRouter itself blocks the VPS's IP, but should still be rotated since it's been exposed in multiple plaintext locations).
+
+**Note (2026-07-27/28):** most of the above "Next Steps" and "Lessons Learned" are now stale — the VPS owner resolved the OpenRouter IP block, the OpenRouter adapter shipped, dynamic provider routing shipped, and the exposed key was rotated. This section is kept as-written for historical record of the original plan; see `Atlas_Technical_Documentation.md` §5, §20–§30 for current state, which is where ongoing technical detail has been tracked since the log below stopped being updated day-to-day.
+
+---
+
+# 2026-07-28 — Full capture coverage + a security incident
+
+Extended the one-click capture bookmarklet (built for ChatGPT the day before) to the other three platforms the user actually switches between when hitting rate limits: **Qwen, DeepSeek, Gemini**. All three now work end-to-end, verified on real conversations, all reusing the same relay-page infrastructure. See `Atlas_Technical_Documentation.md` §27–§29 for the API details of each (Qwen's response-unwrapping bug, DeepSeek's bearer-token + cache-bypass quirks, Gemini's `batchexecute` reverse-engineering).
+
+Mid-session, a real auto-captured conspect turned out to contain live PostgreSQL/MinIO passwords in plaintext, committed to the public repo — the conspecting prompt had faithfully preserved "exact configuration values" as instructed, including ones that shouldn't be public. Removed the file, rotated both passwords on `nikita-vm`, and patched all three system-prompt instances (main + both map-reduce chunk prompts) to redact secret-shaped values going forward. Full writeup in Technical Documentation §30.
+
+Net result: the "write" side of the original vision (agents capture chat snapshots and save them to the knowledge base, regardless of which model was talked to) is now complete for all four platforms the user actually uses. The "read" side — automatically loading the latest conspect into a *new* chat with a different model — is still manual and is the natural next piece of work.
 
 ---
 

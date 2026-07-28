@@ -1,8 +1,8 @@
 # Atlas
 ## Technical Documentation
-Version: 0.2
+Version: 0.3
 Status: Development
-Last updated: 2026-07-27
+Last updated: 2026-07-28
 
 ---
 
@@ -312,9 +312,12 @@ Completed:
 - ✅ Old exposed OpenRouter key rotated; new key stored only in n8n credential + KeePassXC vault, not in plaintext files.
 
 - ✅ **Dynamic provider routing** — form has a `Провайдер` dropdown (Kie/OpenRouter), routed to the right sub-workflow per-run via an expression on the `Execute Workflow` node (§23). No more manually editing the node to switch providers.
+- ✅ **One-click capture bookmarklets for all four target chat platforms** — ChatGPT (§24), Qwen (§27), DeepSeek (§28), Gemini (§29). All four verified end-to-end on real conversations, all POST into the same `atlas-capture` webhook via the shared relay page.
+- ✅ **Secret-leak incident handled** — an auto-captured conspect committed real infra passwords in plaintext (§30). File removed from the repo, both passwords rotated on `nikita-vm`, and the conspecting `system_prompt` (main + both chunking map-prompts) now instructs the model to redact secret-shaped values as `[REDACTED]` instead of reproducing them verbatim.
 
 Pending:
 
+- ⬜ **Context-loader ("read" side)** — the capture bookmarklets only write conspects to the repo; nothing yet reads them back into a *new* chat with a different model. Today the bridge is manual (open the repo, copy the latest conspect, paste it as the first message). Next logical step: a tool that, on opening a new chat, fetches the latest relevant conspect(s) from GitHub and injects them automatically — this is what actually closes the "any model can pick up where another left off" loop.
 - ⬜ Implement additional providers as new sub-workflows using the same contract (Claude; OpenAI) — just add them to the dropdown + ternary/switch expression once built.
 
 ---
@@ -579,3 +582,74 @@ Gotcha (recurrence of an earlier bug class): `JSON.stringify(undefined)` returns
 Verified end-to-end with a synthetic ~173,000-character, 400-exchange test conversation (3 chunks): the final conspect correctly referenced content from **the end** of the conversation (item 399) and correctly reconstructed the pattern spanning the whole thing — not just the beginning, unlike the pre-chunking behavior.
 
 Known trade-off: every capture now costs at least 2 LLM calls (map + reduce) even for short inputs, instead of 1 — deliberate simplification to avoid conditional branching in the graph. Also: this duplicates the "how to call each provider" concern across two Execute Workflow node instances calling the same adapter — acceptable since it's still going through the shared adapter sub-workflow, not re-implementing provider-specific HTTP logic.
+
+---
+
+# 27. Qwen Capture Bookmarklet — DONE (2026-07-28)
+
+Second capture target after ChatGPT (§24). Reuses the exact same relay-page infrastructure (§24) — only the in-page extraction logic differs.
+
+**API**: `GET https://chat.qwen.ai/api/v2/chats/<id>` (`<id>` from the `/c/<id>` URL path), cookie-session auth only — no `Authorization` header needed, confirmed by testing (direct browser navigation without any custom header worked).
+
+**Response shape**: `{success, request_id, data: {id, title, chat: {history: {messages: {<uuid>: {...}}, currentId, currentResponseIds}, models, messages: [...]}}}`. Messages are keyed by UUID in a tree (`parentId`/`childrenIds`), walked from `history.currentId` back to root — same pattern as ChatGPT's `mapping`/`current_node`.
+
+Assistant message text lives inside `content_list[]`, in the entry with `"phase": "answer"` — other `content_list` entries are internal noise (`thinking_summary`, tool calls like `web_extractor`) and are skipped. User messages have their text directly in the top-level `content` string.
+
+**Bug found and fixed during build**: `getConversation()` originally returned the raw `fetch().json()` result directly, but `buildTranscript()` expected `chat` at the object root — the actual API wraps everything one level deeper (`response.data.chat`, not `response.chat`). Symptom: silent empty transcript (`chat.history` always `{}`, no thrown error) rather than a crash — a class of bug worth remembering: an unwrap mismatch fails *quietly* when the code defensively falls back to `{}` at every level. Fixed by having `getConversation()` return `json.data` instead of `json`.
+
+Source: `Projects/Atlas/tools/qwen-capture-bookmarklet.js` + matching README. Verified end-to-end on a real conversation.
+
+---
+
+# 28. DeepSeek Capture Bookmarklet — DONE (2026-07-28)
+
+**API**: `GET https://chat.deepseek.com/api/v0/chat/history_messages?chat_session_id=<id>` (`<id>` from `/a/chat/s/<id>` URL path).
+
+Two things distinguish this one from Qwen/ChatGPT:
+
+1. **Bearer token required despite cookie session already being valid** — DeepSeek's frontend sends `Authorization: Bearer <token>` on top of cookies; a plain unauthenticated request returns `{"code":40003,"msg":"INVALID_TOKEN"}`. There's no session-issuing endpoint to call (unlike ChatGPT's `/api/auth/session`) — the token just sits in `localStorage.getItem("userToken")` as `{value, __version}` JSON, read directly since the bookmarklet runs in-page.
+2. **App-level delta cache** — DeepSeek's own frontend normally calls this endpoint with `cache_version`/`cache_reset_at` query params, and when the server thinks the client's local cache is already current, it returns an **empty** `chat_messages` array (`"cache_control": "MERGE"`) instead of erroring. The bookmarklet deliberately omits both params to always force a full, non-cached response.
+
+**Response shape**: `data.data.biz_data.chat_messages` — notably a **flat array** already (`message_id`, `parent_id`, `role`: `USER`/`ASSISTANT`, `content`: plain string), unlike ChatGPT/Qwen's nested tree. Still walked as a `parent_id` chain from `chat_session.current_message_id` for consistency/robustness against branch edits, even though a flat array could in principle just be used in order.
+
+Source: `Projects/Atlas/tools/deepseek-capture-bookmarklet.js` + README. Verified end-to-end on a real conversation, first try, no bugs found during build.
+
+---
+
+# 29. Gemini Capture Bookmarklet — DONE (2026-07-28)
+
+By far the most involved of the four — Gemini has no plain REST API, it runs on Google's internal `batchexecute` RPC framework (same family as Docs/old Bard).
+
+**Request**: `POST https://gemini.google.com/_/BardChatUi/data/batchexecute?rpcids=hNvQHb&source-path=%2Fapp%2F<rawId>&bl=<bl>&f.sid=<sid>&hl=ru&_reqid=<random>&rt=c`, body `f.req=<encoded RPC array>&at=<token>` where the RPC array is `[[["hNvQHb", "[\"c_<rawId>\",10,null,1,[0],[4],null,1]", null, "generic"]]]`. `hNvQHb` = the RPC id for "load conversation" (found by searching Network response bodies for known conversation text, since request names are opaque). The trailing `[10,null,1,[0],[4],null,1]` args were copied verbatim from one real observed request and are not otherwise understood — not yet verified against a very long, multi-page conversation.
+
+**Three session values required**, none static — extracted live via regex from `document.documentElement.innerHTML` rather than hardcoded, since they're baked into the page's own JS bundle per-session:
+- `SNlM0e` → `at` (anti-CSRF token)
+- `cfb2h` → `bl` (frontend build label — changes with every Gemini deploy)
+- `FdrFJe` → `f.sid` (session id)
+
+**Response format**: Google's standard `)]}'` anti-JSON-hijacking prefix, then repeated `(byte-length-line, JSON-array-line)` pairs. The bookmarklet finds the line starting with `[["wrb.fr"` and `JSON.parse`s its 3rd element *again* (it's a JSON-encoded string nested inside the already-parsed array, not inline JSON).
+
+**Turn extraction — deliberately structure-agnostic**: initial hand-analysis of the nested array (`parsed[0]` assumed to be a *list* of `[turnData, timestamp]` pairs) was wrong for a single-exchange test conversation — `parsed[0]` turned out to be one pair directly, one list-wrapping level shallower than assumed, causing the first working version to silently extract garbage (`turnData` ending up bound to the id-pair array or the timestamp instead of the real turn object — no exception, just empty results). Rather than re-deriving the exact fixed depth (which may itself differ for multi-turn conversations, untested), the final version **recursively scans the entire parsed payload** for any array shaped like a turn — `node.length >= 4 && Array.isArray(node[0]) && node[0].length === 2` with both elements strings (matching the `[convId, respId]` id-pair signature) — and extracts from every match found this way, deduped by that id pair. More robust to exact-depth drift than a fixed-path read.
+
+Per matched turn node: user text at `turnData[2][0][0]`, assistant text at `turnData[3][0][0][1][0]` (only the first response candidate — Gemini can offer multiple drafts, only one is captured).
+
+Source: `Projects/Atlas/tools/gemini-capture-bookmarklet.js` + README. Verified end-to-end on a real conversation. Flagged as the most fragile of the four: `bl` self-adjusts each run since it's re-extracted live, but a genuine `batchexecute` protocol change (new rpcid, different envelope) would break it outright with no graceful degradation.
+
+---
+
+# 30. Secret Leak Incident — RESOLVED (2026-07-28)
+
+An auto-captured conspect (`Projects/Atlas/logs/20260727-043445.md`, a genuine capture from an earlier real conversation about setting up `nikita-vm`) got committed to the **public** `second-brain` repo containing the real PostgreSQL and MinIO root passwords in plaintext — the conspecting `system_prompt` (§25) instructs the model to preserve "конфигурации... конкретные значения", and it dutifully included the passwords verbatim as part of "current state of the infrastructure".
+
+Verified the leak was live (not just theoretical): the PostgreSQL password in the committed file matched the container's actual active `POSTGRES_PASSWORD` at the time.
+
+**Response**:
+1. File removed from the repo (`git rm` + push). History still contains it — accepted as moot once the credentials are rotated.
+2. **`system_prompt` patched** on `nikita-vm`, directly via Postgres (`workflow_entity.nodes` for `Atlas - Kie Adapter`, `ls5hJoxIFtUycpKH`) — all **three** instances of the prompt (the main context-handoff prompt in `Edit Fields`, and both per-chunk "extract everything" prompts hardcoded in the `Chunk Input` Code node, see §26) got one appended line: *"Секреты (пароли, API-ключи, токены доступа и другие учётные данные) не воспроизводи дословно — заменяй значение на [REDACTED], сохраняя только упоминание факта и назначения."* Applied via a Python script piped through `psql` (dollar-quoted JSON payload, to avoid manual SQL-escaping a large nested JSON blob) rather than hand-editing in the n8n UI.
+3. **Both leaked passwords rotated** on `nikita-vm`:
+   - PostgreSQL (`n8n` role): changed live via `ALTER USER ... WITH PASSWORD`, then `/opt/apps/postgres/.env` and `/opt/apps/n8n/.env` (`DB_POSTGRESDB_PASSWORD`) updated to match, `n8n` container restarted to pick up the new value. (Note: `POSTGRES_PASSWORD` in the postgres container's own `.env` only takes effect on first init of an empty data volume — the live `ALTER USER` was the actual fix; updating `.env` was for consistency/documentation only.)
+   - MinIO (`admin` root user): `MINIO_ROOT_PASSWORD` updated in `/opt/apps/minio/.env`, container restarted — MinIO re-reads root credentials from env on every startup, no live `ALTER`-equivalent needed.
+   - Confirmed no n8n credential referenced MinIO (checked `credentials_entity` table) — only the Atlas-specific credentials (Kie.ai, GitHub, OpenRouter, docs-sync, capture) exist, so nothing else needed updating.
+   - New passwords communicated to the project owner for their own KeePassXC vault; not stored anywhere in this repo or in n8n beyond the credentials/env vars listed above.
+
+Takeaway for future conspects: the redaction instruction is now baked into the standing `system_prompt`, so this should self-prevent going forward, but it's a reminder that an LLM instructed to "preserve exact configuration values" will do exactly that — including values that shouldn't be preserved in a public repo.

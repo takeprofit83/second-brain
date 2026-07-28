@@ -654,7 +654,7 @@ Verified the leak was live (not just theoretical): the PostgreSQL password in th
 
 ---
 
-# 31. Course/Project Routing for Captures — IN PROGRESS (2026-07-28)
+# 31. Course/Project Routing for Captures — DONE (2026-07-28)
 
 Problem: the capture pipeline had no concept of *which* target directory a conspect belongs to — every capture (bookmarklet or manual form) landed in `Projects/Atlas/logs/` regardless of subject matter. One real example already committed there: `Projects/Atlas/logs/20260727-032743.md`, captured from a ChatGPT conversation titled "Урок 26 Разбор процесса" — actually course material for the user's n8n-automation/content-factory course, not Atlas-project history. The user separately created `Courses/` (empty, `.gitkeep` only) in `second-brain` for exactly this kind of content and wants captures routed there automatically instead of hand-sorted after the fact.
 
@@ -686,13 +686,79 @@ The three node edits above were applied via n8n's **public REST API** (`PUT /api
 - **Windows PowerShell 5.1 reads `.ps1` files without a BOM using the system codepage**, so literal Cyrillic characters written into a script file (e.g. by an external tool) get mis-decoded and break the parser with confusing "unexpected token" errors mid-string. Workaround: encode Cyrillic literals as base64 in the script and decode with `[System.Text.Encoding]::UTF8.GetString([Convert]::FromBase64String(...))` at runtime instead of writing them literally.
 - Default Windows execution policy blocks running any local `.ps1` at all (`PSSecurityException: выполнение сценариев отключено`) — resolved per-invocation with `powershell -ExecutionPolicy Bypass -File ...`, no system-wide policy change needed.
 
+## A second field-loss bug, found only after real testing
+
+Even after the three node edits above went live, two real course captures (via the ChatGPT bookmarklet, "Курс" button) still landed in `Projects/Atlas/logs/` instead of `Courses/`. Root cause: the map-reduce chunking path (§26) drops any field not explicitly threaded through it.
+
+- **`Chunk Input`** (Code node) destructured only `{ user_input, system_prompt, provider }` from its input and returned only those same fields (plus `original_system_prompt`) — silently dropping `project` (and it would drop any other new field the same way).
+- **`Combine Chunks`** (Code node) already had a workaround for this exact problem for `provider` — it reaches back to `$('Chunk Input').first().json.provider` to "rescue" the value after the per-chunk extraction calls (`Call 'Atlas-Kie Adapter Core'`) return only their own extraction output. It just hadn't been updated to do the same for `project`.
+- **`Call Adapter (Final)`** (Execute Workflow node calling the final Kie/OpenRouter adapter) *also* strips everything down to whatever the sub-workflow returns (`question, system_prompt, answer, model, tokens, cost, created_at` — confirmed by reading the sub-workflow's own final Code node). So `Create a file`, which sits downstream of this node, can never read `$json.project` directly — it has to reach back to an earlier node's output instead, exactly like `Combine Chunks` already does for `provider`.
+
+**Fix:** added `project` to `Chunk Input`'s destructuring and both its return branches, added `project: chunkInputFirst.project` to `Combine Chunks`'s output, and changed `Create a file`'s `filePath` expression from `$json.project` to `$('Combine Chunks').first().json.project`. All three were plain-text edits (Code node JS, or a single expression field) done directly in the n8n UI without issue — the earlier UI friction was specific to the Form Trigger's structured field list, not to text/code fields.
+
+One more gotcha hit while editing the `filePath` expression: pasting a full string starting with `=` into a field where the `fx`/expression toggle already implies a leading `=` produces a literal double `==`, which n8n does not evaluate as an expression at all. When handing someone n8n expression code to paste into an `fx`-enabled field, give the content *without* a leading `=` — the editor supplies it.
+
+## Cleanup
+
+3 course captures made while debugging (duplicates of the same test chat) had already landed in `Projects/Atlas/logs/` before the fix; moved to `Courses/` via `git mv` once the real cause was confirmed.
+
 ## Status as of 2026-07-28
 
-- ✅ n8n workflow nodes (`Edit Fields`, `On form submission`, `Create a file`) updated and confirmed live (`PUT` returned `200`).
-- ⬜ **Relay page not yet deployed** — `atlas-relay-page-REAL-SECRET.html` locally updated with the Atlas/Курс picker UI, but `tangerine-vps:/var/www/html/atlas-relay-d42332f0300f625f.html` still serves the old auto-send version as of this writing (verified via `grep -c 'btn-courses'` on the server returning `0`). User needs to run:
-  ```
-  Get-Content "atlas-relay-page-REAL-SECRET.html" -Raw -Encoding UTF8 | ssh tangerine-vps "cat > /var/www/html/atlas-relay-d42332f0300f625f.html"
-  ```
-- ⬜ Not yet tested end-to-end: no real course conspect has been captured through the new picker to confirm it actually lands in `Courses/`.
+- ✅ n8n workflow nodes (`Edit Fields`, `On form submission`, `Create a file`, `Chunk Input`, `Combine Chunks`) all updated and live.
+- ✅ Relay page deployed to `tangerine-vps` — the earlier plain-text `Get-Content | ssh ... "cat > file"` deploy corrupted the Cyrillic button labels (PowerShell re-encodes piped text through its own console codepage when handing it to an external process, regardless of the source file's actual encoding); fixed by doing a base64 round-trip instead (`[Convert]::ToBase64String($bytes) | ssh ... "base64 -d > file"`).
+- ✅ **Verified end-to-end with a real course capture**: `Courses/20260728-033852.md`, captured via the ChatGPT bookmarklet with the "Курс" button, landed correctly.
 
 Takeaway for future conspects: the redaction instruction is now baked into the standing `system_prompt`, so this should self-prevent going forward, but it's a reminder that an LLM instructed to "preserve exact configuration values" will do exactly that — including values that shouldn't be preserved in a public repo.
+
+---
+
+# 32. Model-Parameterized OpenRouter Adapter + Polza Adapter — DONE (2026-07-28)
+
+## Problem
+
+Two related asks: (1) make Claude reachable as a conspect provider (originally scoped as a new "Atlas-Claude Adapter Core"), and (2) add Polza.ai as a second RU-payable aggregator alongside OpenRouter, per the user's stated leaning after comparing several aggregators (see project memory `project_vsellm_course_server`). Partway through, the user pointed out a naming/design smell: `Atlas-Kie Adapter Core` and `Atlas-OpenRouter Adapter Core` are named after the *aggregator*, but each has a specific *model* (`gemini-2.5-flash`, `openai/gpt-4o-mini`) hardcoded inside — so adding Claude by creating a third near-identical workflow (just swapping the model string) would violate the project's own no-duplication principle (`docs/PROJECT_PRINCIPLES.md`).
+
+## Decision: parameterize `model`, don't duplicate workflows per model
+
+Per ADR-001 (`docs/DECISIONS.md`), an Adapter Core corresponds to a *provider/aggregator*, not a specific model — the model is just a call parameter. Since OpenRouter (and Polza, same API shape) can serve any model behind a single account, one parameterized adapter can serve GPT, Claude, or anything else the aggregator carries, with zero duplication.
+
+**Changes to `Atlas-OpenRouter Adapter Core`:**
+- `When Executed by Another Workflow`: added a third declared input, `model` (type `any`).
+- `HTTP Request`: `"model": "openai/gpt-4o-mini"` → `"model": {{ JSON.stringify($json.model || 'openai/gpt-4o-mini') }}` — same default as before if the caller doesn't specify one.
+
+**Changes to `Call Adapter (Final)`** (in `Atlas - Kie Adapter`): added `model: {{ $json.model }}` to its `workflowInputs` mapping, alongside the existing `user_input`/`system_prompt`.
+
+Confirmed via OpenRouter's own model catalog that Claude Sonnet 5 is reachable there as `anthropic/claude-sonnet-5` ([openrouter.ai/anthropic/claude-sonnet-5](https://openrouter.ai/anthropic/claude-sonnet-5)) — so no separate Anthropic API key/billing was needed at all; the existing `atlas openrouter account` credential covers it.
+
+**Not yet done:** nothing upstream of `Call Adapter (Final)` actually sets a `model` value yet — no UI field exists for it in `On form submission`, and `Edit Fields`/`Chunk Input`/`Combine Chunks` don't propagate it (same three-node relay pattern used for `project` in §31 would be needed). Until that's built, `model` is always empty in production traffic and every call silently uses the hardcoded default. Deliberately deferred — the user wants a free-text "Модель" form field (not a fixed dropdown, since valid models vary per aggregator) wired through before this is actually reachable end-to-end.
+
+## Gotcha: Execute Workflow node's input-schema auto-sync can get stuck
+
+Adding the `model` input above required the `Call Adapter (Final)` node (an Execute Workflow node) to pick up the new field from the sub-workflow's schema. This failed repeatedly through the UI:
+
+- The node's "Workflow" field holds a **dynamic expression** (`{{ $json.provider === "OpenRouter" ? ... : ... }}`), not a fixed ID. n8n's schema-fetch (the small refresh icon, or "Refresh Input List" in the `⋮` menu) cannot resolve an expression at design time, so it silently fails to pick up new fields — "Add All Inputs" stays permanently disabled.
+- Workaround attempted: temporarily replace the expression with a literal fixed workflow ID, refresh, then restore the expression. This *still* didn't work reliably in this n8n version — "Add All Inputs" stayed disabled even against a resolvable fixed ID, and the cached `schema` array in the DB never gained the new field despite multiple refreshes.
+- **Actual fix:** gave up on the UI schema-sync entirely and patched `workflowId` + `workflowInputs.value` + `workflowInputs.schema` directly via the n8n public API (same `PUT /api/v1/workflows/{id}` pattern as §31), with the user creating/deleting a throwaway API key as before. The script also restored the dynamic `workflowId` expression as part of the same write, since that had been left hardcoded mid-troubleshooting.
+- Same `=`-prefix gotcha as above bit again here: pasting a plain workflow ID into the "Workflow" field's `fx`-enabled box produced `=FCHKR5wwDT1ZYdKu` (double `=` in effect) — an invalid ID, which was itself part of why the fixed-ID workaround didn't initially help either. Toggling `fx` off before typing a plain ID avoids this.
+
+## `Atlas-Polza Adapter Core` (new)
+
+Researched Polza.ai's API directly (not assumed): OpenAI-compatible, base URL `https://api.polza.ai/api/v1`, endpoint `/chat/completions`, `Authorization: Bearer <key>`, models addressed as `provider/model` (e.g. `openai/gpt-4o`) — same shape as OpenRouter. Source: [polza.ai/blog/api-neyrosetei](https://polza.ai/blog/api-neyrosetei), [polza.mintlify.app/api-reference/introduction](https://polza.mintlify.app/api-reference/introduction).
+
+Built by duplicating the now-model-parameterized `Atlas-OpenRouter Adapter Core` (workflow id `gu85dO6jBAoB1S9r`) rather than building from scratch, since the request/response shape and the `model` parameterization are identical — only two fields differ:
+- `HTTP Request` URL → `https://api.polza.ai/api/v1/chat/completions`
+- `HTTP Request` Authentication → switched from `predefinedCredentialType: openRouterApi` to `genericCredentialType` / `httpBearerAuth`, credential `atlas polza account` (id `zflQUbZxZSdo4Rk6`).
+
+Wired into the router: `Call Adapter (Final)`'s `Workflow` expression extended from a 2-way to a 3-way ternary:
+```
+{{ $json.provider === "OpenRouter" ? "FCHKR5wwDT1ZYdKu" : $json.provider === "Polza" ? "gu85dO6jBAoB1S9r" : "7xFzsr8lAy5q51CH" }}
+```
+and `On form submission`'s `Провайдер` dropdown got a third option, `Polza`.
+
+**Verified end-to-end**, with two real hiccups along the way that are useful to remember:
+1. First test failed with `"Workflow is not active and cannot be executed."` — newly duplicated n8n workflows are **inactive by default**; the sub-workflow has to be manually activated before an `Execute Workflow` node can call it, even though it's never triggered directly itself.
+2. Second test failed with `402` / `INSUFFICIENT_BALANCE` (`"Недостаточно средств... баланс: 0.00 ₽"`) — Polza account had zero balance. This actually confirmed the integration was otherwise correct (request reached Polza, auth succeeded, model was accepted — it only failed on payment). After topping up, a real conspect was committed successfully (`Projects/Atlas/logs/20260728-200438.md`).
+
+## n8n execution data is not readable as plain nested JSON
+
+Debugging the failures above required reading raw execution data from `execution_data` in Postgres (`SELECT data FROM execution_data WHERE "executionId"=...`). n8n stores this as a **flat array with integer-string references** (e.g. `{"message":"25"}` means "look up index 25 in the same top-level array" — not literal value `"25"`), not the object shape you'd expect from a REST API response. Grepping for a key like `"message"` only returns the reference number, not the actual error text; the reference has to be manually resolved by reading the whole array. There is no shortcut found for this yet — reading the file directly and manually cross-referencing indices was the only way that worked this session.

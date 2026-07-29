@@ -803,3 +803,36 @@ and `On form submission`'s `Провайдер` dropdown got a third option, `Po
 ## n8n execution data is not readable as plain nested JSON
 
 Debugging the failures above required reading raw execution data from `execution_data` in Postgres (`SELECT data FROM execution_data WHERE "executionId"=...`). n8n stores this as a **flat array with integer-string references** (e.g. `{"message":"25"}` means "look up index 25 in the same top-level array" — not literal value `"25"`), not the object shape you'd expect from a REST API response. Grepping for a key like `"message"` only returns the reference number, not the actual error text; the reference has to be manually resolved by reading the whole array. There is no shortcut found for this yet — reading the file directly and manually cross-referencing indices was the only way that worked this session.
+
+---
+
+# 33. Atlas - Model Relay — DONE (2026-07-29)
+
+## Goal
+
+This is what the earlier Claude/model-parameterization work (§32) was actually building toward: the user's original question was how to make two AI models exchange responses with each other automatically, without personally relaying text between chat windows. Scoped down early on to something realistic — this session's Claude Code agent (with live tool access) can't itself be looped into an API call, but a plain chat-completion model can, so the target became "an automated GPT ↔ Claude debate," not "clone this agent."
+
+## Design
+
+New standalone workflow, **`Atlas - Model Relay`** (id `IAY5X80s26Zz06RV`), independent of the main `Atlas - Kie Adapter` orchestrator (no chunking, no course/project routing — this produces a different kind of artifact). Reuses the existing adapter architecture rather than calling any provider API directly:
+
+- **Trigger**: a small form (`On form submission`) with two fields — `Тема` (the debate topic/opening prompt, textarea) and `Провайдер` (dropdown: `OpenRouter` / `Polza` — which aggregator account to route both sides through).
+- **6 sequential `Execute Workflow` nodes** (`Call GPT 1/2/3`, `Call Claude 1/2/3`), hardcoded to a fixed 3 rounds (not a loop construct — see below for why) — each calls the *same* adapter workflow (`Atlas-OpenRouter Adapter Core` or `Atlas-Polza Adapter Core`, chosen via the `Провайдер` field) with a fixed `model` (`openai/gpt-4o-mini` for the "GPT" nodes, `anthropic/claude-sonnet-5` for the "Claude" nodes) and `user_input` wired to read the *previous* node's `.answer` output — so each reply becomes the next model's prompt. `Call GPT 1` reads the original `Тема` field instead, since there's no prior reply yet.
+- **`Combine Transcript`** (Code node): assembles all 6 replies plus the original topic into one markdown document with `## GPT` / `## Claude` headers per turn.
+- **`Save to GitHub`**: commits the transcript to a new `Debates/` folder (`{yyyyLLdd-HHmmss}.md`), sibling to `Projects/Atlas/logs/` and `Courses/` — a genuinely new content type (an automated dialogue, not a captured human conversation), so it gets its own top-level folder rather than being shoehorned into either existing one.
+
+**Why a fixed 6-node chain instead of a real loop:** n8n's loop constructs (`Split in Batches`/`Loop Over Items`) require carrying accumulated state across iterations, which is fiddly to wire correctly and — after today's repeated fights with `Execute Workflow`'s schema-sync UI — judged not worth the added risk for a fixed, small round count. Fixed at 3 rounds (6 calls) per the user's own choice; if a configurable round count is wanted later, revisit as a real loop then, not preemptively.
+
+**Why the `Провайдер` field on this form, separately from the model choice:** initially built hardcoded to OpenRouter only. The user (who tops up Polza, not OpenRouter, and had a `402` balance failure on the first real test) pointed out the aggregator itself should be switchable too, same as the main capture form. Fixed by adding the field and changing all 6 nodes' `workflowId` from a fixed value to `{{ $('On form submission').item.json["Провайдер"] === "Polza" ? "gu85dO6jBAoB1S9r" : "FCHKR5wwDT1ZYdKu" }}`.
+
+## How it was built
+
+Created via the n8n public API (`POST /api/v1/workflows`) rather than assembled by hand in the UI — building 9 new nodes with correct cross-references one field at a time in the UI would have been far slower and riskier than generating the whole structure programmatically, especially after today's UI friction on simpler tasks. Followed the same proven-safe pattern from §32 (serialize each node individually via `ConvertTo-Json`, never the whole nested object at once) to avoid the `ConvertTo-Json` hang bug.
+
+Two new mistakes made and fixed along the way, worth remembering for next time:
+- **A literal em-dash (`—`) in a plain string parameter** (`"Atlas — Model Relay"`) broke the `.ps1` script the same way literal Cyrillic does — not a Cyrillic-specific problem, it's *any* non-ASCII character in a BOM-less `.ps1` file under Windows PowerShell 5.1. Fixed by using a plain hyphen instead. General rule going forward: keep `.ps1` script files **pure ASCII**, no exceptions, and pass any non-ASCII content in as base64 or read from an external UTF-8 file instead.
+- **PowerShell's `ConvertTo-Json` collapsed single-element nested arrays** — an n8n `connections` entry needs the shape `"main": [[{...}]]` (an array of arrays), but constructing it as `@(@([PSCustomObject]@{...}))` and piping through `ConvertTo-Json` produced `"main": [{...}]` instead (the inner single-element array got silently unwrapped into a bare object), which n8n's schema validator rejected outright (`Expected array, received object`). This is the well-known PowerShell array-unwrapping gotcha, here hitting inside `ConvertTo-Json` output rather than a simple variable assignment. Fixed by building the `connections` object as a literal JSON string via plain concatenation instead of relying on `ConvertTo-Json` for it at all.
+
+## Verified end-to-end
+
+Real test: topic "Что важнее для стартапа — скорость или качество?", Провайдер=Polza. All 6 calls succeeded (~75 seconds total), producing a substantive back-and-forth — GPT gave conventional MVP/balance framing, Claude repeatedly pushed back with sharper specifics (Airbnb's photography-only quality investment, technical debt as *nonlinear* rather than linear "interest," DORA metrics as a leading indicator of architectural decay, Bezos's one-way/two-way-doors framing for irreversibility). Committed to `Debates/20260729-032647.md`. This closes the loop on the session's original goal: two models now genuinely converse without the user manually relaying text between them.

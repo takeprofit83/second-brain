@@ -304,6 +304,18 @@ Verified end-to-end with three real calls: OpenRouter + Claude Sonnet 5, OpenRou
 
 ---
 
+# 2026-07-29 — Atlas - Model Relay: the original session goal, closed
+
+Circled back to the question that kicked off the whole model-adapter/Claude/Polza thread: how to let two AI models exchange responses automatically, without the user relaying text between chat windows by hand. Built a new standalone workflow, `Atlas - Model Relay`, that alternates between a "GPT" and a "Claude" adapter call 3 rounds (6 calls), each reply becoming the next model's prompt, then commits the full transcript to a new `Debates/` folder. Reused the existing adapter architecture entirely — no new provider integration needed, just orchestration on top of what already existed.
+
+Also added a `Провайдер` switch (OpenRouter/Polza) to this new form, after the first real test failed on an OpenRouter balance error — the user pointed out they top up Polza, not OpenRouter, so the aggregator choice needed to be switchable here too, same as the main capture form.
+
+Built via the n8n API (`POST /workflows`, creating all 9 nodes programmatically) rather than by hand — hit two new variants of today's recurring encoding/serialization gotchas (a literal em-dash breaking a `.ps1` file the same way Cyrillic does; `ConvertTo-Json` silently collapsing a single-element nested array, which n8n's schema validator then rejected). Both documented with fixes in `Atlas_Technical_Documentation.md` §33.
+
+**Verified end-to-end** with a real topic ("Что важнее для стартапа — скорость или качество?"): a substantive 6-turn exchange, Claude repeatedly pushing back on GPT's more conventional framing with sharper specifics (nonlinear technical debt, DORA metrics, Bezos's one-way/two-way-doors heuristic). Committed to `Debates/20260729-032647.md`. This is the point the session's original question gets a real, working answer.
+
+---
+
 # User Preferences During Development
 
 - Short answers.

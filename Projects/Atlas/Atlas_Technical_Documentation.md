@@ -836,3 +836,14 @@ Two new mistakes made and fixed along the way, worth remembering for next time:
 ## Verified end-to-end
 
 Real test: topic "Что важнее для стартапа — скорость или качество?", Провайдер=Polza. All 6 calls succeeded (~75 seconds total), producing a substantive back-and-forth — GPT gave conventional MVP/balance framing, Claude repeatedly pushed back with sharper specifics (Airbnb's photography-only quality investment, technical debt as *nonlinear* rather than linear "interest," DORA metrics as a leading indicator of architectural decay, Bezos's one-way/two-way-doors framing for irreversibility). Committed to `Debates/20260729-032647.md`. This closes the loop on the session's original goal: two models now genuinely converse without the user manually relaying text between them.
+
+## Next phase — PLANNED, not built (2026-07-29)
+
+Right after the first successful test, the user clarified the actual motivation: the debate content itself isn't the point — the two models should reason **grounded in real Second Brain context** (an actual conspect), not an arbitrary topic string. Planned design, deliberately deferred to a future session rather than rushed:
+
+1. New node "List Logs Folder" — `HTTP Request`, `GET https://api.github.com/repos/takeprofit83/second-brain/contents/Projects/Atlas/logs`, credential `predefinedCredentialType: githubApi` (untested whether `HTTP Request` actually accepts this predefined type the way it does `openRouterApi` — verify first, may need a plain Header Auth credential instead).
+2. New Code node "Pick Latest Filename" — sort the returned file list by `name` descending (filenames are `yyyyLLdd-HHmmss.md`, so alphabetical order = chronological order), take index 0. Needs to defensively handle n8n possibly returning the GitHub array either as one item or auto-split into many items — untested which.
+3. New `n8n-nodes-base.github` node (resource=file, operation=get — the same node type already proven via `Create a file`'s sibling operations) to fetch that file's content — returns base64, needs a small decode step (`Buffer.from(...,'base64').toString('utf-8')`).
+4. `Call GPT 1`'s `user_input` changes from just `Тема` to the fetched conspect content + `Тема` as "what to discuss/analyze about this."
+
+Not built yet because all of steps 1–3 use node types/response shapes not exercised anywhere else this session (GitHub directory listing, non-JSON HTTP response handling) — high chance of needing the same kind of debugging rounds every other new node type needed today, and the session had already run very long by this point.

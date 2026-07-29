@@ -730,7 +730,48 @@ Per ADR-001 (`docs/DECISIONS.md`), an Adapter Core corresponds to a *provider/ag
 
 Confirmed via OpenRouter's own model catalog that Claude Sonnet 5 is reachable there as `anthropic/claude-sonnet-5` ([openrouter.ai/anthropic/claude-sonnet-5](https://openrouter.ai/anthropic/claude-sonnet-5)) — so no separate Anthropic API key/billing was needed at all; the existing `atlas openrouter account` credential covers it.
 
-**Not yet done:** nothing upstream of `Call Adapter (Final)` actually sets a `model` value yet — no UI field exists for it in `On form submission`, and `Edit Fields`/`Chunk Input`/`Combine Chunks` don't propagate it (same three-node relay pattern used for `project` in §31 would be needed). Until that's built, `model` is always empty in production traffic and every call silently uses the hardcoded default. Deliberately deferred — the user wants a free-text "Модель" form field (not a fixed dropdown, since valid models vary per aggregator) wired through before this is actually reachable end-to-end.
+**Update — done (2026-07-29):** `model` is now fully wired end-to-end, same three-node relay pattern as `project` in §31:
+- `On form submission` — added a plain text field `Модель` (not a dropdown — valid model IDs vary per aggregator and change too often to maintain a fixed list).
+- `Edit Fields` — added assignment `model`: `{{ $json["Модель"] || $json.body?.model || "" }}`.
+- `Chunk Input` / `Combine Chunks` — `model` added to destructuring/returns exactly like `project` was, for the same reason (the chunking boundary drops untracked fields).
+
+**Design decision on scope:** the automatic capture path (bookmarklets → relay page → `atlas-capture` webhook) deliberately does **not** get a model picker — it always sends nothing for `model`, so it silently uses each adapter's hardcoded default. The `Модель` field only exists on the manual form, for deliberate one-off testing/experimentation, not everyday capture. Exact model IDs aren't meant to be memorized — look them up in the aggregator's own model catalog each time (e.g. `openrouter.ai/models`).
+
+**Verified end-to-end with three real test calls:**
+- OpenRouter + `anthropic/claude-sonnet-5` → `Projects/Atlas/logs/20260729-024731.md`
+- OpenRouter + `anthropic/claude-opus-5` → `Projects/Atlas/logs/20260729-024731.md` (same file, different test run)
+- Polza + `yandex/yandexgpt-5-lite` → `Projects/Atlas/logs/20260729-025617.md` — confirmed via the adapter's own response echo (`data.model` field) that Polza genuinely routed to YandexGPT, not a silent fallback. (This particular test's *content* came out generic/templated because the test input — "кто ты? ответь максимально кратко" — was too trivial for the two-stage map-reduce prompt to extract anything meaningful from; not a routing bug.)
+
+## A third encoding bug: `ConvertTo-Json` hangs on certain Cyrillic text
+
+While applying the `Chunk Input`/`Combine Chunks` edits above via the API (same reason as §31 — the Form Trigger's structured field editor doesn't reliably support manual field additions in this n8n version), the standard approach broke in a new way: the whole-object `$payload | ConvertTo-Json -Depth N` call **hung indefinitely** (multiple minutes, never completing, no error) specifically once the `Chunk Input` node's `jsCode` — containing long Russian paragraphs with `«»` guillemets and em-dashes (—) — was included in the object being serialized. Confirmed via a per-node diagnostic loop that serialization succeeded fine for 7 other nodes and hung exactly on this one.
+
+Root cause not fully isolated (Windows PowerShell 5.1's `ConvertTo-Json` uses internal regex-based string escaping, which is known to have catastrophic-backtracking-style performance cliffs on certain character patterns), but the fix doesn't require knowing the exact trigger: **bypass `ConvertTo-Json` entirely for the offending strings**, using a manual, non-regex JSON string escaper instead:
+
+```powershell
+function Escape-JsonStringManual([string]$s) {
+    $sb = New-Object System.Text.StringBuilder
+    [void]$sb.Append('"')
+    foreach ($ch in $s.ToCharArray()) {
+        switch ($ch) {
+            '"'  { [void]$sb.Append('\"'); continue }
+            '\'  { [void]$sb.Append('\\'); continue }
+            "`n" { [void]$sb.Append('\n'); continue }
+            "`r" { continue }
+            "`t" { [void]$sb.Append('\t'); continue }
+            default {
+                if ([int][char]$ch -lt 0x20) { [void]$sb.Append(('\u{0:X4}' -f [int][char]$ch)) }
+                else { [void]$sb.Append($ch) }
+            }
+        }
+    }
+    [void]$sb.Append('"')
+    return $sb.ToString()
+}
+```
+JSON natively allows raw UTF-8 characters inside strings — only `"`, `\`, and control characters actually need escaping, so this simple character-by-character pass is both correct and immune to the regex performance cliff. Used this for just the two problematic node bodies, kept `ConvertTo-Json -Depth 15 -Compress` for the other (unproblematic) nodes, and assembled the final PUT body via plain string concatenation instead of one big object-level `ConvertTo-Json` call.
+
+**General takeaway for future n8n-via-API edits:** if a whole-object `ConvertTo-Json` call in Windows PowerShell 5.1 seems to hang (not error, just never return) on a payload containing longer non-ASCII text, don't keep waiting or retrying with different `-Depth` values — isolate which node/string is responsible (serialize each node individually in a loop) and hand-escape just that string instead.
 
 ## Gotcha: Execute Workflow node's input-schema auto-sync can get stuck
 

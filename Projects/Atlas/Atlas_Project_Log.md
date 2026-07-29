@@ -294,6 +294,16 @@ Also built and shipped `Atlas-Polza Adapter Core` (duplicated from the now-param
 
 ---
 
+# 2026-07-29 — Model field wired end-to-end, verified with 3 real providers
+
+Finished what §32 above deferred: added a `Модель` text field to the capture form and threaded `model` through `Edit Fields` → `Chunk Input` → `Combine Chunks` (same fix pattern as `project` — the chunking boundary silently drops any field not explicitly carried through it). Deliberately scoped to the manual form only, not the automatic bookmarklet/relay path — everyday capture shouldn't require knowing exact model IDs, that's an experimentation feature.
+
+Hit a new, nastier flavor of the recurring Cyrillic-encoding problem: applying the fix via the n8n API, a whole-object `ConvertTo-Json` call in Windows PowerShell 5.1 hung indefinitely (not an error — just never returned) specifically once the long Russian system-prompt text embedded in `Chunk Input`'s code was included. Diagnosed by serializing each node individually in a loop until the exact culprit node was found, then worked around by hand-writing a simple, regex-free JSON string escaper for just that one field instead of relying on `ConvertTo-Json`. Full writeup with the escaper code in `Atlas_Technical_Documentation.md` §32.
+
+Verified end-to-end with three real calls: OpenRouter + Claude Sonnet 5, OpenRouter + Claude Opus 5, and Polza + YandexGPT-5-lite (confirmed via the adapter's own response echo that Polza genuinely routed to Yandex, not a silent fallback — the generic output content was just an artifact of an intentionally trivial test prompt, not a bug).
+
+---
+
 # User Preferences During Development
 
 - Short answers.

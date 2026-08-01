@@ -847,3 +847,44 @@ Right after the first successful test, the user clarified the actual motivation:
 4. `Call GPT 1`'s `user_input` changes from just `Тема` to the fetched conspect content + `Тема` as "what to discuss/analyze about this."
 
 Not built yet because all of steps 1–3 use node types/response shapes not exercised anywhere else this session (GitHub directory listing, non-JSON HTTP response handling) — high chance of needing the same kind of debugging rounds every other new node type needed today, and the session had already run very long by this point.
+
+---
+
+# 34. Conspect Quality Fixes + Raw-Transcript Safety Net — DONE (2026-08-01)
+
+## Read this first if you're a model picking up context from `Projects/Atlas/logs/` or `Courses/`
+
+Every capture now produces **up to two files sharing the same filename base**, `{yyyyLLdd-HHmmss}-{source}[-{chatId}]`:
+
+- **`....md`** — the LLM-generated context-handoff conspect (per the system_prompt described in §25, since strengthened — see below). Meant to be a complete, self-sufficient handoff document, but for genuinely long/multi-part conversations it can still under-represent detail (known limitation, not fully solved — see "Known limitation" below).
+- **`....-raw.md`** — the **verbatim captured transcript**, no LLM processing at all, guaranteed lossless. Added specifically because the conspect above cannot be fully trusted to be complete for long conversations.
+
+**If a conspect seems thin, generic, or is missing something you'd expect — check for a sibling `-raw.md` file with the same timestamp/source/chatId prefix and read that instead.** It always exists for bookmarklet-sourced captures (manual-form captures also get one, just without a `chatId` in the name). Both files are written with the exact same timestamp (computed once in `Edit Fields` as `captureTimestamp` and threaded to both `Create a file` nodes), so they always pair up by filename prefix.
+
+`source` is one of `chatgpt` / `qwen` / `deepseek` / `gemini` (from the matching capture bookmarklet, §24/27/28/29) or `manual` (submitted via the form, no platform detected). `chatId` is the platform's own conversation ID (e.g. ChatGPT's `/c/<id>`) when known — present for bookmarklet captures, absent for manual ones.
+
+**Note for the planned Model-Relay "pick latest conspect" feature (§33 "Next phase"):** sorting `Projects/Atlas/logs/` filenames descending still correctly surfaces the *conspect* (not the raw file) for the most recent capture, even though both share a timestamp prefix — `-raw.md` sorts immediately *before* the plain `.md` in a descending string sort (`-` < `.` in ASCII), so index 0 after a descending sort is always the conspect. Don't assume this without re-checking if the naming scheme changes later.
+
+## What changed and why
+
+Real-world use surfaced three separate problems with the conspect pipeline, found via captures made during actual course project work (`Courses/` — a HeyGen/n8n video pipeline for a university diploma, unrelated to Atlas itself):
+
+1. **Pass-1 extraction over-compressed even short inputs.** The `Chunk Input` node's per-chunk "extract everything" system_prompt (both the ≤60000-char branch and the chunked-split branch) let the model generalize instead of preserving detail — first suspected during Model Relay testing (2026-07-29, dismissed then as "test prompt too trivial," incorrectly) and confirmed for real on 2026-08-01 against substantive course-project captures. **Fix:** rewrote both copies of the prompt to explicitly forbid summarizing/compressing and demand exhaustive extraction ("лучше длинный избыточный текст с повторами, чем потерянная деталь").
+2. **The conspect reported project status but not the assistant's own reasoning.** Even after fix #1, conspects read as a status report (state/decisions/done/todo/risks) with no trace of what the AI actually proposed, argued for/against, or considered and rejected during the conversation — user feedback: "без этого порой не понять саму суть диалога." **Fix:** added an explicit category to both the main context-handoff prompt (`Edit Fields`' `system_prompt`) and the `Chunk Input` per-chunk prompts requiring a content-ful retelling of the assistant's reasoning/proposals/alternatives, not just outcomes.
+3. **Long, multi-chunk conversations still collapsed to a few paragraphs after fix #1 and #2.** Root cause: the "reduce" step (`Combine Chunks` → `Call Adapter (Final)`) ran a SINGLE final LLM call over all combined per-chunk extracts, using the same "write a complete document" framing regardless of how much material was actually being fed in — for a 9-part conversation that had hit ChatGPT's own length limit 3 times, this collapsed to ~20 lines, essentially just paraphrasing the tail of the conversation. **Fix (partial):** `Combine Chunks` now uses a different system_prompt when `items.length > 1` — one that explicitly frames the task as "merge/deduplicate already-complete extracts, do not write a new compressed document" — but this is a same-graph, prompt-only mitigation, not a structural fix, and its ceiling is still whatever a single LLM call can reliably retain from a very large combined input.
+
+**Known limitation (not solved, mitigated instead):** for very long conversations, LLM-based reduction into one final document is inherently lossy — prompt tuning (fix #3) helps but doesn't guarantee completeness, and Kie.ai's default model (`gemini-2.5-flash`) may also silently truncate oversized single-call inputs (same failure mode originally documented in §26). Rather than keep chasing prompt-perfection, item 4 below makes this failure mode harmless.
+
+4. **Raw-transcript safety net (the actual fix that matters for #3).** Added a new node, `Save Raw` (duplicated from `Create a file`, same GitHub credential), wired as a **second, parallel branch straight off `Edit Fields`** — alongside the existing `Edit Fields → Chunk Input → ... → Create a file` conspect path, not replacing it. `Save Raw` writes `$json.user_input` (the untouched captured transcript) directly to `{project-folder}/{captureTimestamp}-{source}[-{chatId}]-raw.md`, no LLM call involved at all. This guarantees zero information loss regardless of how well or badly the conspect pipeline performs — verified end-to-end on the same 9-part/25,173-line conversation that exposed problem #3: the raw file captured it in full while the conspect for the same capture was still only ~20 lines.
+
+## Files touched
+
+- `Atlas - Kie Adapter` workflow (`ls5hJoxIFtUycpKH`): `Edit Fields` (added `source`, `chatId`, `captureTimestamp` fields), `Chunk Input` (prompt rewrites), `Combine Chunks` (conditional merge prompt), `Create a file` (filename now uses `captureTimestamp` + `source` + `chatId`), new `Save Raw` node.
+- `Projects/Atlas/tools/{chatgpt,qwen,deepseek,gemini}-capture-bookmarklet.js`: each now sends `source` (hardcoded per platform) and `chatId` (already-extracted conversation ID) alongside `text`/`provider`, plus a cache-busting `?t=<timestamp>` query param on the relay-page URL (see gotcha below).
+- Relay page (`atlas-relay-<slug>.html` on `tangerine-vps`, not in the repo — see §24): forwards `source`/`chatId` through to the `atlas-capture` webhook body alongside the existing `text`/`provider`/`project`.
+
+## Gotchas hit along the way (also added to memory `feedback_classifier_blocks_prod_writes`)
+
+- A freshly-reconstructed bookmarklet (built from the repo's `.js` source + a placeholder relay URL) fails in two different, easily-confused ways: opening via plain left-click with the placeholder still unreplaced opens a small popup on the *source site's own homepage* instead of the relay page (`window.open` resolving a bogus relative path); opening via right-click "open in new window" throws the script's own "not on a conversation page" guard error even when you genuinely are on one, because `javascript:` bookmarklets only execute correctly via a plain left-click on the bookmarks bar. Always get the real relay URL from an already-working bookmark (ask to see it, decode it) rather than reconstructing blind.
+- A bookmark's stored URL must be a single-line, fully percent-encoded `javascript:...` string (`[System.Uri]::EscapeDataString` in PowerShell, no `node`/minifier needed) with the real relay URL already baked in — pasting raw multi-line `.js` source into the browser's bookmark-edit URL field doesn't reliably survive.
+- The relay page has no `Cache-Control` header, so a browser can keep serving a stale cached copy after the page is updated server-side — fixed by appending `?t=<timestamp>` to the URL passed to `window.open()` so it's always treated as a fresh resource.

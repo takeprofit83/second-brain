@@ -85,7 +85,7 @@
       return;
     }
 
-    const relay = window.open(RELAY_URL, "atlas_relay", "width=420,height=200");
+    const relay = window.open(RELAY_URL + "?t=" + Date.now(), "atlas_relay", "width=420,height=200");
     if (!relay) {
       alert("Atlas: браузер заблокировал всплывающее окно — разреши попапы для chatgpt.com и попробуй снова.");
       return;

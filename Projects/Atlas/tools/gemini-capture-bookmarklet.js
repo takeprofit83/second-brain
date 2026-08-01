@@ -135,7 +135,7 @@
     function onMessage(event) {
       if (event.source !== relay) return;
       if (event.data && event.data.type === "atlas-ready") {
-        relay.postMessage({ type: "atlas-payload", text, provider: PROVIDER }, "*");
+        relay.postMessage({ type: "atlas-payload", text, provider: PROVIDER, source: "gemini", chatId: rawId }, "*");
         window.removeEventListener("message", onMessage);
       }
     }

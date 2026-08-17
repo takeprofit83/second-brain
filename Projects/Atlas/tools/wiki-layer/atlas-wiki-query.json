@@ -1,0 +1,104 @@
+{
+  "name": "Atlas - Wiki Query",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "atlas-wiki-query",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "edb340bd-6805-7963-a22e-b717a4327471",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-900, 0],
+      "webhookId": "acc9d122-8772-a50d-5895-00733611ae78",
+      "credentials": {
+        "httpHeaderAuth": { "id": "REPLACE_ME", "name": "atlas wiki query secret" }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://api.github.com/repos/takeprofit83/second-brain/contents/Knowledge/index.md",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "githubApi",
+        "options": {
+          "response": { "response": { "fullResponse": true, "neverError": true } }
+        }
+      },
+      "id": "e0fec2e5-5e1c-2589-6526-cb9698a1fbd2",
+      "name": "Get Index",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-680, 0],
+      "credentials": {
+        "githubApi": { "id": "REPLACE_ME", "name": "REPLACE WITH YOUR EXISTING GITHUB CREDENTIAL" }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const resp = $json;\nconst decoded = (resp.statusCode === 200 && resp.body && resp.body.content)\n  ? Buffer.from(resp.body.content, 'base64').toString('utf-8')\n  : \"\";\nreturn [{ json: { decoded_index: decoded } }];"
+      },
+      "id": "ae60e002-3b65-4747-fcf9-35ab59c466d4",
+      "name": "Decode Index",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-460, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const decodedIndex = $json.decoded_index;\nconst body = ($('Webhook').item.json.body) || {};\nconst question = body.question || \"\";\nreturn [{ json: { combined_input: JSON.stringify({ index: decodedIndex, question: question }) } }];"
+      },
+      "id": "dff135a3-9f58-a31e-3f95-3b33ed904c9a",
+      "name": "Build LLM Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-240, 0]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "FCHKR5wwDT1ZYdKu",
+          "mode": "id",
+          "cachedResultName": "Atlas-OpenRouter Adapter Core"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "user_input": "={{ $json.combined_input }}",
+            "system_prompt": "Answer using ONLY the provided wiki index as context. Cite the page name(s) your answer draws on. If the index doesn't cover the question, say so explicitly instead of guessing.",
+            "model": "anthropic/claude-sonnet-5"
+          }
+        }
+      },
+      "id": "94041f9e-d045-8a67-eeab-96e4349e9c6a",
+      "name": "Call Wiki Query LLM",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [-20, 0]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ answer: $json.answer }) }}",
+        "options": {}
+      },
+      "id": "bb607fac-e478-df66-3dbc-73cd6c23275b",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [200, 0]
+    }
+  ],
+  "connections": {
+    "Webhook": { "main": [[{ "node": "Get Index", "type": "main", "index": 0 }]] },
+    "Get Index": { "main": [[{ "node": "Decode Index", "type": "main", "index": 0 }]] },
+    "Decode Index": { "main": [[{ "node": "Build LLM Input", "type": "main", "index": 0 }]] },
+    "Build LLM Input": { "main": [[{ "node": "Call Wiki Query LLM", "type": "main", "index": 0 }]] },
+    "Call Wiki Query LLM": { "main": [[{ "node": "Respond to Webhook", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" }
+}

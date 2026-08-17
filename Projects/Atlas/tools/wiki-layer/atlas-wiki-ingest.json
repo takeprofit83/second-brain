@@ -1,0 +1,302 @@
+{
+  "name": "Atlas - Wiki Ingest",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "atlas-wiki-ingest",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "b91eeec4-1dac-48e9-e4f2-32da3eb3cd59",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-1400, 0],
+      "webhookId": "066d4b2a-3183-ccfa-c3a7-7783e4ff16c5",
+      "credentials": {
+        "httpHeaderAuth": { "id": "REPLACE_ME", "name": "atlas wiki ingest secret" }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://api.github.com/repos/takeprofit83/second-brain/contents/Knowledge/index.md",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "githubApi",
+        "options": {
+          "response": { "response": { "fullResponse": true, "neverError": true } }
+        }
+      },
+      "id": "ca624d3e-4c52-503d-5b01-51e4587285e3",
+      "name": "Get Index",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-1180, 0],
+      "credentials": {
+        "githubApi": { "id": "REPLACE_ME", "name": "REPLACE WITH YOUR EXISTING GITHUB CREDENTIAL" }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const resp = $json;\nconst decoded = (resp.statusCode === 200 && resp.body && resp.body.content)\n  ? Buffer.from(resp.body.content, 'base64').toString('utf-8')\n  : \"\";\nreturn [{ json: { decoded_index: decoded } }];"
+      },
+      "id": "1f588f79-c519-f6ec-8723-b97ff93175b4",
+      "name": "Decode Index",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-960, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const decodedIndex = $json.decoded_index;\nconst body = ($('Webhook').item.json.body) || {};\nconst newConspect = body.content || \"\";\nreturn [{ json: { combined_input: JSON.stringify({ current_index: decodedIndex, new_conspect: newConspect }) } }];"
+      },
+      "id": "0692ff59-d6a9-aac5-2a2c-29c90a8f3843",
+      "name": "Build LLM Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-740, 0]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "FCHKR5wwDT1ZYdKu",
+          "mode": "id",
+          "cachedResultName": "Atlas-OpenRouter Adapter Core"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "user_input": "={{ $json.combined_input }}",
+            "system_prompt": "Given the current wiki index and one new conspect, decide ONE topic page to create or update (not several). Output STRICT JSON only, no markdown code fences, no extra text: {\"page_path\": \"Knowledge/<slug>.md\", \"page_title\": \"...\", \"page_content\": \"<full markdown page, use [[wikilink]] syntax for references to other Knowledge/ pages>\", \"index_line\": \"<one markdown list line for index.md>\"}. <slug> must be lowercase-kebab-case, ASCII only (transliterate Russian if needed). If the conspect doesn't warrant a new page, still pick the closest existing page from the index and update it rather than skipping - always return exactly one page.",
+            "model": "anthropic/claude-sonnet-5"
+          }
+        }
+      },
+      "id": "6f6e28a2-f225-7cb1-08d7-28a863ed9f21",
+      "name": "Call Wiki Ingest LLM",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [-520, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "let raw = $json.answer || \"\";\nraw = raw.trim();\nif (raw.startsWith(\"```\")) {\n  raw = raw.replace(/^```(json)?\\n?/, \"\").replace(/```\\s*$/, \"\");\n}\nlet parsed;\ntry {\n  parsed = JSON.parse(raw);\n} catch (e) {\n  throw new Error(\"Wiki Ingest LLM did not return valid JSON: \" + e.message + \" | raw: \" + raw.slice(0, 300));\n}\nif (!parsed.page_path || !parsed.page_content || !parsed.index_line) {\n  throw new Error(\"Wiki Ingest LLM JSON missing required fields: \" + JSON.stringify(parsed));\n}\nreturn [{ json: parsed }];"
+      },
+      "id": "a83e622d-19d6-ad1d-6e06-c53e6cb47c0b",
+      "name": "Parse LLM JSON",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-300, 0]
+    },
+    {
+      "parameters": {
+        "url": "=https://api.github.com/repos/takeprofit83/second-brain/contents/{{ $json.page_path }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "githubApi",
+        "options": {
+          "response": { "response": { "fullResponse": true, "neverError": true } }
+        }
+      },
+      "id": "36c58a67-ee06-dc46-2d61-1527dcc4e574",
+      "name": "Check Page Exists",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-80, 0],
+      "credentials": {
+        "githubApi": { "id": "REPLACE_ME", "name": "REPLACE WITH YOUR EXISTING GITHUB CREDENTIAL" }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [
+            {
+              "id": "844a3faa-e996-ffd6-193c-b6d33c7e8311",
+              "leftValue": "={{ $json.statusCode }}",
+              "rightValue": 200,
+              "operator": { "type": "number", "operation": "equals" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "4937522a-f272-8702-3128-61b411f421be",
+      "name": "Page Exists?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [140, 0]
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "operation": "edit",
+        "owner": { "__rl": true, "value": "takeprofit83", "mode": "list" },
+        "repository": { "__rl": true, "value": "second-brain", "mode": "list" },
+        "filePath": "={{ $('Parse LLM JSON').item.json.page_path }}",
+        "fileContent": "={{ $('Parse LLM JSON').item.json.page_content }}",
+        "commitMessage": "=wiki: update {{ $('Parse LLM JSON').item.json.page_path }}"
+      },
+      "id": "7ecb705e-f6d7-7f58-7d37-e85b93546662",
+      "name": "Edit Page",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1.1,
+      "position": [360, -120],
+      "credentials": {
+        "githubApi": { "id": "REPLACE_ME", "name": "REPLACE WITH YOUR EXISTING GITHUB CREDENTIAL" }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "operation": "create",
+        "owner": { "__rl": true, "value": "takeprofit83", "mode": "list" },
+        "repository": { "__rl": true, "value": "second-brain", "mode": "list" },
+        "filePath": "={{ $('Parse LLM JSON').item.json.page_path }}",
+        "fileContent": "={{ $('Parse LLM JSON').item.json.page_content }}",
+        "commitMessage": "=wiki: create {{ $('Parse LLM JSON').item.json.page_path }}"
+      },
+      "id": "3d148d87-8c25-0725-2816-81fef2a53631",
+      "name": "Create Page",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1.1,
+      "position": [360, 120],
+      "credentials": {
+        "githubApi": { "id": "REPLACE_ME", "name": "REPLACE WITH YOUR EXISTING GITHUB CREDENTIAL" }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://api.github.com/repos/takeprofit83/second-brain/contents/Knowledge/index.md",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "githubApi",
+        "options": {
+          "response": { "response": { "fullResponse": true, "neverError": true } }
+        }
+      },
+      "id": "c1bc2880-5993-3523-121c-197f9baf6e2b",
+      "name": "Get Index Fresh",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [580, 0],
+      "credentials": {
+        "githubApi": { "id": "REPLACE_ME", "name": "REPLACE WITH YOUR EXISTING GITHUB CREDENTIAL" }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const resp = $('Get Index Fresh').item.json;\nconst decoded = (resp.statusCode === 200 && resp.body && resp.body.content)\n  ? Buffer.from(resp.body.content, 'base64').toString('utf-8')\n  : \"\";\nconst line = $('Parse LLM JSON').item.json.index_line;\nconst updated = decoded.includes(line) ? decoded : (decoded.trimEnd() + \"\\n\" + line + \"\\n\");\nreturn [{ json: { new_index_content: updated } }];"
+      },
+      "id": "4325a33d-1266-1d96-a20e-857d24f5db11",
+      "name": "Append Index Line",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [800, 0]
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "operation": "edit",
+        "owner": { "__rl": true, "value": "takeprofit83", "mode": "list" },
+        "repository": { "__rl": true, "value": "second-brain", "mode": "list" },
+        "filePath": "Knowledge/index.md",
+        "fileContent": "={{ $json.new_index_content }}",
+        "commitMessage": "=wiki: index += {{ $('Parse LLM JSON').item.json.page_path }}"
+      },
+      "id": "295d9807-83f3-5fe9-c416-a6be10c6c35b",
+      "name": "Edit Index",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1.1,
+      "position": [1020, 0],
+      "credentials": {
+        "githubApi": { "id": "REPLACE_ME", "name": "REPLACE WITH YOUR EXISTING GITHUB CREDENTIAL" }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://api.github.com/repos/takeprofit83/second-brain/contents/Knowledge/log.md",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "githubApi",
+        "options": {
+          "response": { "response": { "fullResponse": true, "neverError": true } }
+        }
+      },
+      "id": "12c2980b-ca57-188f-9888-78d537b5c0f8",
+      "name": "Get Log Fresh",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1240, 0],
+      "credentials": {
+        "githubApi": { "id": "REPLACE_ME", "name": "REPLACE WITH YOUR EXISTING GITHUB CREDENTIAL" }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const resp = $('Get Log Fresh').item.json;\nconst decoded = (resp.statusCode === 200 && resp.body && resp.body.content)\n  ? Buffer.from(resp.body.content, 'base64').toString('utf-8')\n  : \"\";\nconst now = new Date().toISOString().replace('T',' ').substring(0,19);\nconst webhookBody = ($('Webhook').item.json.body) || {};\nconst sourcePath = webhookBody.source_path || 'unknown';\nconst pagePath = $('Parse LLM JSON').item.json.page_path;\nconst line = `${now} | ingest | ${sourcePath} -> ${pagePath}`;\nreturn [{ json: { new_log_content: decoded.trimEnd() + \"\\n\" + line + \"\\n\" } }];"
+      },
+      "id": "7c2de013-bbbf-7b04-1bca-25931652d277",
+      "name": "Append Log Line",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1460, 0]
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "operation": "edit",
+        "owner": { "__rl": true, "value": "takeprofit83", "mode": "list" },
+        "repository": { "__rl": true, "value": "second-brain", "mode": "list" },
+        "filePath": "Knowledge/log.md",
+        "fileContent": "={{ $json.new_log_content }}",
+        "commitMessage": "wiki: log ingest"
+      },
+      "id": "d1c3e6e7-b015-586e-0b32-a70cfa3747de",
+      "name": "Edit Log",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1.1,
+      "position": [1680, 0],
+      "credentials": {
+        "githubApi": { "id": "REPLACE_ME", "name": "REPLACE WITH YOUR EXISTING GITHUB CREDENTIAL" }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: \"ok\", page_path: $('Parse LLM JSON').item.json.page_path }) }}",
+        "options": {}
+      },
+      "id": "c54e0e7f-a259-ef0f-a8c2-31fbc430f385",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [1900, 0]
+    }
+  ],
+  "connections": {
+    "Webhook": { "main": [[{ "node": "Get Index", "type": "main", "index": 0 }]] },
+    "Get Index": { "main": [[{ "node": "Decode Index", "type": "main", "index": 0 }]] },
+    "Decode Index": { "main": [[{ "node": "Build LLM Input", "type": "main", "index": 0 }]] },
+    "Build LLM Input": { "main": [[{ "node": "Call Wiki Ingest LLM", "type": "main", "index": 0 }]] },
+    "Call Wiki Ingest LLM": { "main": [[{ "node": "Parse LLM JSON", "type": "main", "index": 0 }]] },
+    "Parse LLM JSON": { "main": [[{ "node": "Check Page Exists", "type": "main", "index": 0 }]] },
+    "Check Page Exists": { "main": [[{ "node": "Page Exists?", "type": "main", "index": 0 }]] },
+    "Page Exists?": {
+      "main": [
+        [{ "node": "Edit Page", "type": "main", "index": 0 }],
+        [{ "node": "Create Page", "type": "main", "index": 0 }]
+      ]
+    },
+    "Edit Page": { "main": [[{ "node": "Get Index Fresh", "type": "main", "index": 0 }]] },
+    "Create Page": { "main": [[{ "node": "Get Index Fresh", "type": "main", "index": 0 }]] },
+    "Get Index Fresh": { "main": [[{ "node": "Append Index Line", "type": "main", "index": 0 }]] },
+    "Append Index Line": { "main": [[{ "node": "Edit Index", "type": "main", "index": 0 }]] },
+    "Edit Index": { "main": [[{ "node": "Get Log Fresh", "type": "main", "index": 0 }]] },
+    "Get Log Fresh": { "main": [[{ "node": "Append Log Line", "type": "main", "index": 0 }]] },
+    "Append Log Line": { "main": [[{ "node": "Edit Log", "type": "main", "index": 0 }]] },
+    "Edit Log": { "main": [[{ "node": "Respond to Webhook", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" }
+}

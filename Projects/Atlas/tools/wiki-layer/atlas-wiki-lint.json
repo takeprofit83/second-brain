@@ -1,0 +1,318 @@
+{
+  "name": "Atlas - Wiki Lint",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "cronExpression", "expression": "0 4 * * *" }]
+        }
+      },
+      "id": "3e8633cf-9698-72dd-2655-17f225eaa604",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [-1600, 0]
+    },
+    {
+      "parameters": {
+        "url": "https://api.github.com/repos/takeprofit83/second-brain/contents/Knowledge",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "githubApi",
+        "options": {
+          "response": { "response": { "fullResponse": true, "neverError": true } }
+        }
+      },
+      "id": "cd687623-c718-3b99-a05a-338c01ee9c8e",
+      "name": "List Knowledge Files",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-1380, 0],
+      "credentials": {
+        "githubApi": { "id": "REPLACE_ME", "name": "REPLACE WITH YOUR EXISTING GITHUB CREDENTIAL" }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://api.github.com/repos/takeprofit83/second-brain/contents/Knowledge/index.md",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "githubApi",
+        "options": {
+          "response": { "response": { "fullResponse": true, "neverError": true } }
+        }
+      },
+      "id": "7f6bc556-f520-1b04-5996-22e817ba8521",
+      "name": "Get Index",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-1160, 0],
+      "credentials": {
+        "githubApi": { "id": "REPLACE_ME", "name": "REPLACE WITH YOUR EXISTING GITHUB CREDENTIAL" }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const listResp = $('List Knowledge Files').item.json;\nconst files = (listResp.body || []);\nconst filenames = files\n  .filter(f => f.type === 'file' && f.name.endsWith('.md') && !['index.md','log.md','lint-report.md'].includes(f.name))\n  .map(f => f.name);\n\nconst indexResp = $('Get Index').item.json;\nconst decodedIndex = (indexResp.statusCode === 200 && indexResp.body && indexResp.body.content)\n  ? Buffer.from(indexResp.body.content, 'base64').toString('utf-8')\n  : \"\";\n\nconst missingFromIndex = filenames.filter(name => !decodedIndex.includes(name));\nconst mentioned = [...decodedIndex.matchAll(/([a-z0-9-]+\\.md)/gi)].map(m => m[1]);\nconst danglingInIndex = [...new Set(mentioned)].filter(name => !['index.md','log.md'].includes(name) && !filenames.includes(name));\n\nconst now = new Date().toISOString().replace('T',' ').substring(0,19);\nconst summaryLine = `${now} | lint | fixed:${missingFromIndex.length} reported:${danglingInIndex.length}`;\n\nreturn [{ json: { missing_from_index: missingFromIndex, dangling_in_index: danglingInIndex, decoded_index: decodedIndex, summary_line: summaryLine } }];"
+      },
+      "id": "31fe5734-9d9f-c8a4-7a16-c984c6e8664f",
+      "name": "Compare",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-940, 0]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [
+            {
+              "id": "7cb9802c-87e6-ab65-22b8-f3621b1b747b",
+              "leftValue": "={{ $json.missing_from_index.length }}",
+              "rightValue": 0,
+              "operator": { "type": "number", "operation": "gt" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "0b3d217a-143d-a154-76c2-0fc3ac89290f",
+      "name": "Has Missing?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [-720, -220]
+    },
+    {
+      "parameters": {
+        "url": "https://api.github.com/repos/takeprofit83/second-brain/contents/Knowledge/index.md",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "githubApi",
+        "options": {
+          "response": { "response": { "fullResponse": true, "neverError": true } }
+        }
+      },
+      "id": "e76f1882-bd11-b4ec-9d91-9dd7756e1119",
+      "name": "Get Index Fresh2",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-500, -220],
+      "credentials": {
+        "githubApi": { "id": "REPLACE_ME", "name": "REPLACE WITH YOUR EXISTING GITHUB CREDENTIAL" }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const resp = $('Get Index Fresh2').item.json;\nconst decoded = (resp.statusCode === 200 && resp.body && resp.body.content)\n  ? Buffer.from(resp.body.content, 'base64').toString('utf-8')\n  : $('Compare').item.json.decoded_index;\nconst missing = $('Compare').item.json.missing_from_index;\nlet updated = decoded;\nfor (const name of missing) {\n  if (!updated.includes(name)) {\n    updated = updated.trimEnd() + `\\n- [[${name.replace(/\\.md$/,'')}]] (auto-added by lint, no description yet)\\n`;\n  }\n}\nreturn [{ json: { new_index_content: updated } }];"
+      },
+      "id": "15c4da47-2bb6-b9ca-647f-580c93e89464",
+      "name": "Append Missing Entries",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-280, -220]
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "operation": "edit",
+        "owner": { "__rl": true, "value": "takeprofit83", "mode": "list" },
+        "repository": { "__rl": true, "value": "second-brain", "mode": "list" },
+        "filePath": "Knowledge/index.md",
+        "fileContent": "={{ $json.new_index_content }}",
+        "commitMessage": "wiki: lint auto-fix missing index entries"
+      },
+      "id": "9af48246-5967-dbd2-de84-9ef228706c29",
+      "name": "Edit Index",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1.1,
+      "position": [-60, -220],
+      "credentials": {
+        "githubApi": { "id": "REPLACE_ME", "name": "REPLACE WITH YOUR EXISTING GITHUB CREDENTIAL" }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [
+            {
+              "id": "60da5c96-7d95-1e28-26da-8462884f303d",
+              "leftValue": "={{ $json.dangling_in_index.length }}",
+              "rightValue": 0,
+              "operator": { "type": "number", "operation": "gt" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "fb7b1234-c093-822a-e4ae-c52a42d22f3f",
+      "name": "Has Dangling?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [-720, 0]
+    },
+    {
+      "parameters": {
+        "url": "https://api.github.com/repos/takeprofit83/second-brain/contents/Knowledge/lint-report.md",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "githubApi",
+        "options": {
+          "response": { "response": { "fullResponse": true, "neverError": true } }
+        }
+      },
+      "id": "c02c5d38-5e9e-a729-fb68-e418f56f1c9a",
+      "name": "Get Report Fresh",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-500, 0],
+      "credentials": {
+        "githubApi": { "id": "REPLACE_ME", "name": "REPLACE WITH YOUR EXISTING GITHUB CREDENTIAL" }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const resp = $('Get Report Fresh').item.json;\nconst existed = resp.statusCode === 200;\nconst dangling = $('Compare').item.json.dangling_in_index;\nconst now = new Date().toISOString().replace('T',' ').substring(0,19);\nconst body = `# Wiki Lint Report\\n\\nLast run: ${now}\\n\\n## Dangling references (in index.md, no matching file in Knowledge/)\\n\\n` +\n  (dangling.length ? dangling.map(n => `- ${n}`).join('\\n') : '_none_') + '\\n';\nreturn [{ json: { report_content: body, report_existed: existed } }];"
+      },
+      "id": "588d8cd6-3e9a-a5b2-e6b3-34badb2c703a",
+      "name": "Build Report Content",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-280, 0]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [
+            {
+              "id": "da829880-56a5-ee17-0009-9623417108a2",
+              "leftValue": "={{ $json.report_existed }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "true" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "9f3a1c7e-2b6d-4e91-8a5c-7d0b3f6e2c14",
+      "name": "Report Exists?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [-60, 0]
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "operation": "edit",
+        "owner": { "__rl": true, "value": "takeprofit83", "mode": "list" },
+        "repository": { "__rl": true, "value": "second-brain", "mode": "list" },
+        "filePath": "Knowledge/lint-report.md",
+        "fileContent": "={{ $json.report_content }}",
+        "commitMessage": "wiki: lint report update"
+      },
+      "id": "2a4f6b8d-1e3c-4a7f-9d2b-5c8e0f1a3b6d",
+      "name": "Edit Report",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1.1,
+      "position": [160, -110],
+      "credentials": {
+        "githubApi": { "id": "REPLACE_ME", "name": "REPLACE WITH YOUR EXISTING GITHUB CREDENTIAL" }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "operation": "create",
+        "owner": { "__rl": true, "value": "takeprofit83", "mode": "list" },
+        "repository": { "__rl": true, "value": "second-brain", "mode": "list" },
+        "filePath": "Knowledge/lint-report.md",
+        "fileContent": "={{ $json.report_content }}",
+        "commitMessage": "wiki: lint report created"
+      },
+      "id": "6d3e8a1c-4f7b-4c2e-8a9d-1b5f3e7c2a04",
+      "name": "Create Report",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1.1,
+      "position": [160, 110],
+      "credentials": {
+        "githubApi": { "id": "REPLACE_ME", "name": "REPLACE WITH YOUR EXISTING GITHUB CREDENTIAL" }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://api.github.com/repos/takeprofit83/second-brain/contents/Knowledge/log.md",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "githubApi",
+        "options": {
+          "response": { "response": { "fullResponse": true, "neverError": true } }
+        }
+      },
+      "id": "8e2c4a6d-3f1b-4d8e-9c5a-2b7f1e4d8a36",
+      "name": "Get Log Fresh",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-500, 220],
+      "credentials": {
+        "githubApi": { "id": "REPLACE_ME", "name": "REPLACE WITH YOUR EXISTING GITHUB CREDENTIAL" }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const resp = $('Get Log Fresh').item.json;\nconst decoded = (resp.statusCode === 200 && resp.body && resp.body.content)\n  ? Buffer.from(resp.body.content, 'base64').toString('utf-8')\n  : \"\";\nconst line = $('Compare').item.json.summary_line;\nreturn [{ json: { new_log_content: decoded.trimEnd() + \"\\n\" + line + \"\\n\" } }];"
+      },
+      "id": "1d5b3f7a-6c2e-4a9d-8b1f-3e7c5a2d9f48",
+      "name": "Append Log Line",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-280, 220]
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "operation": "edit",
+        "owner": { "__rl": true, "value": "takeprofit83", "mode": "list" },
+        "repository": { "__rl": true, "value": "second-brain", "mode": "list" },
+        "filePath": "Knowledge/log.md",
+        "fileContent": "={{ $json.new_log_content }}",
+        "commitMessage": "wiki: log lint run"
+      },
+      "id": "4c8e1a3f-7b5d-4e2a-9c6f-1a3d8b5e2c70",
+      "name": "Edit Log",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1.1,
+      "position": [-60, 220],
+      "credentials": {
+        "githubApi": { "id": "REPLACE_ME", "name": "REPLACE WITH YOUR EXISTING GITHUB CREDENTIAL" }
+      }
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": { "main": [[{ "node": "List Knowledge Files", "type": "main", "index": 0 }]] },
+    "List Knowledge Files": { "main": [[{ "node": "Get Index", "type": "main", "index": 0 }]] },
+    "Get Index": { "main": [[{ "node": "Compare", "type": "main", "index": 0 }]] },
+    "Compare": {
+      "main": [
+        [
+          { "node": "Has Missing?", "type": "main", "index": 0 },
+          { "node": "Has Dangling?", "type": "main", "index": 0 },
+          { "node": "Get Log Fresh", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Has Missing?": { "main": [[{ "node": "Get Index Fresh2", "type": "main", "index": 0 }], []] },
+    "Get Index Fresh2": { "main": [[{ "node": "Append Missing Entries", "type": "main", "index": 0 }]] },
+    "Append Missing Entries": { "main": [[{ "node": "Edit Index", "type": "main", "index": 0 }]] },
+    "Has Dangling?": { "main": [[{ "node": "Get Report Fresh", "type": "main", "index": 0 }], []] },
+    "Get Report Fresh": { "main": [[{ "node": "Build Report Content", "type": "main", "index": 0 }]] },
+    "Build Report Content": { "main": [[{ "node": "Report Exists?", "type": "main", "index": 0 }]] },
+    "Report Exists?": {
+      "main": [
+        [{ "node": "Edit Report", "type": "main", "index": 0 }],
+        [{ "node": "Create Report", "type": "main", "index": 0 }]
+      ]
+    },
+    "Get Log Fresh": { "main": [[{ "node": "Append Log Line", "type": "main", "index": 0 }]] },
+    "Append Log Line": { "main": [[{ "node": "Edit Log", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" }
+}

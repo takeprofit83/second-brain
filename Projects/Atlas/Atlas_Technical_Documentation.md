@@ -888,3 +888,131 @@ Real-world use surfaced three separate problems with the conspect pipeline, foun
 - A freshly-reconstructed bookmarklet (built from the repo's `.js` source + a placeholder relay URL) fails in two different, easily-confused ways: opening via plain left-click with the placeholder still unreplaced opens a small popup on the *source site's own homepage* instead of the relay page (`window.open` resolving a bogus relative path); opening via right-click "open in new window" throws the script's own "not on a conversation page" guard error even when you genuinely are on one, because `javascript:` bookmarklets only execute correctly via a plain left-click on the bookmarks bar. Always get the real relay URL from an already-working bookmark (ask to see it, decode it) rather than reconstructing blind.
 - A bookmark's stored URL must be a single-line, fully percent-encoded `javascript:...` string (`[System.Uri]::EscapeDataString` in PowerShell, no `node`/minifier needed) with the real relay URL already baked in — pasting raw multi-line `.js` source into the browser's bookmark-edit URL field doesn't reliably survive.
 - The relay page has no `Cache-Control` header, so a browser can keep serving a stale cached copy after the page is updated server-side — fixed by appending `?t=<timestamp>` to the URL passed to `window.open()` so it's always treated as a fresh resource.
+
+---
+
+# 35. Knowledge Wiki Layer — DESIGNED (2026-08-17), not yet built
+
+## Correction from the original proposal
+
+The 2026-08-17 project-log entry proposed a new `Wiki/` folder. That was wrong — `Knowledge/` already exists in `second-brain` (created earlier, currently empty except `.gitkeep`, documented in `README.md` as "заметки и конспекты"). This section uses `Knowledge/` throughout; no new top-level folder needed.
+
+## Scope decision: three small workflows, no loops
+
+Per `docs/PROJECT_PRINCIPLES.md` ("каждый workflow — одна задача") and the precedent in ADR-010 (avoid n8n loop constructs after repeated `Execute Workflow`/loop pain this project has hit — §21, §32, §33), each piece below is scoped to avoid needing `Split in Batches`/`Loop Over Items` entirely, even where a "complete" version would normally use one. Where that costs coverage (see Lint), it's called out explicitly rather than silently accepted.
+
+All three reuse the existing adapter contract (`user_input`, `system_prompt`, `model` → `Atlas-OpenRouter Adapter Core`, per ADR-001/ADR-008) — no new provider integration.
+
+## 35.1 `Atlas - Wiki Ingest`
+
+Standalone workflow with its own webhook, called by ONE new `HTTP Request` node added at the end of the existing `Atlas - Kie Adapter` pipeline (after `Create a file` / `Save Raw` succeed) — deliberately not rebuilt into that pipeline directly, to avoid touching a workflow that already has several documented fragile spots (§26, §31, §34).
+
+```
+Webhook (POST /webhook/atlas-wiki-ingest, Header Auth, new credential "atlas wiki ingest secret")
+  expects: { content: string, source_path: string }
+
+→ HTTP Request "Get Index"
+    GET https://api.github.com/repos/takeprofit83/second-brain/contents/Knowledge/index.md
+    same GitHub auth as the existing Create/Edit-a-file nodes
+    On Error: Continue (index.md may legitimately not exist yet on first run)
+
+→ Code "Decode Index"
+    base64-decode the previous node's `content` field if present, else ""
+
+→ Execute Workflow "Call Wiki Ingest LLM" → Atlas-OpenRouter Adapter Core
+    model: "anthropic/claude-sonnet-5"
+    system_prompt (fixed): given the current wiki index and one new conspect, decide ONE topic
+      page to create or update (not several — keeps this loop-free), output STRICT JSON only:
+      {"page_path": "Knowledge/<slug>.md", "page_title": "...", "page_content": "<full markdown
+      page, using [[wikilink]] syntax for references to other Knowledge/ pages>",
+      "index_line": "<one markdown list line for index.md>"}
+    user_input: JSON.stringify({ current_index: <decoded index>, new_conspect: content })
+
+→ Code "Parse LLM JSON"
+    strip ``` fences if the model wrapped its output, then JSON.parse — throw a clear error
+    (don't silently fall back to {}) so a malformed response surfaces as a failed execution,
+    not a quietly-corrupted page
+
+→ GitHub "Upsert Page" (resource=file)
+    ⚠ open question, verify before wiring: does n8n's GitHub node `edit` operation
+    auto-create the file if it doesn't exist yet, or does it error and require a separate
+    `create` call? Not exercised anywhere in this project yet (all existing `Create a file`/
+    `Edit a file` nodes target files whose existence is already known). If it errors on
+    missing files, add a `Get` + `If` branch (same pattern as "Get Index" above) before this
+    node, same as the general upsert problem already solved once for `index.md` below.
+
+→ GitHub "Append Index" (edit Knowledge/index.md)
+    re-fetch fresh (don't reuse "Get Index"'s output — avoids clobbering a concurrent ingest
+    run that landed between this run's start and now), append `index_line`, write back.
+    If "Get Index" 404'd at the top (first-ever page), this node's own fetch will also 404 —
+    branch to a `create` op with `index_line` as the entire initial content in that case.
+
+→ GitHub "Append Log" (edit Knowledge/log.md, same re-fetch-fresh + create-if-missing pattern)
+    appends one line: `{{$now.format('yyyy-LL-dd HH:mm:ss')}} | ingest | {{source_path}} -> {{page_path}}`
+
+→ Respond to Webhook { status: "ok", page_path }
+```
+
+## 35.2 `Atlas - Wiki Query` — closes Technical Documentation §17 ("Context-loader")
+
+```
+Webhook (POST /webhook/atlas-wiki-query, Header Auth, new credential "atlas wiki query secret")
+  expects: { question: string }
+
+→ HTTP Request "Get Index" (same as 35.1)
+→ Code "Decode Index"
+→ Execute Workflow "Call Wiki Query LLM" → Atlas-OpenRouter Adapter Core
+    model: "anthropic/claude-sonnet-5"
+    system_prompt (fixed): "Answer using ONLY the provided wiki index as context. Cite the
+      page name(s) your answer draws on. If the index doesn't cover the question, say so
+      explicitly instead of guessing."
+    user_input: JSON.stringify({ index: <decoded index>, question })
+→ Respond to Webhook { answer: $json.answer }
+```
+
+**v1 deliberately grounds only on `Knowledge/index.md`** (a curated table of contents, not full page bodies) — cheap (one LLM call, small context) and good enough to bootstrap a new chat session's context. **v2, not built now:** if index-only answers prove too shallow, add a step that greps `index_line`s for keyword overlap with the question and fetches the matching `Knowledge/<slug>.md` page bodies too, before the LLM call — deferred until real usage shows it's actually needed, per this project's own repeated lesson about not building ahead of a confirmed real problem (§33's "Next phase" note is the same judgment call).
+
+**Telegram front-end (optional, separate follow-up, not part of this spec):** n8n has a native `Telegram Trigger` node — a `/ask <question>` command wired to this same LLM-question logic, replying via a `Telegram` node, gives RU-friendly mobile access with no VPN. Not built now — flagged as a cheap add-on once the webhook itself is verified working.
+
+## 35.3 `Atlas - Wiki Lint`
+
+Scoped to what's checkable in a **single GitHub "list directory" call plus one Code node** — no per-page content fetch, no loop, and consequently **no LLM call at all** (pure string comparison, zero AI cost):
+
+```
+Schedule Trigger (Cron, e.g. daily 04:00)
+
+→ HTTP Request "List Knowledge Files"
+    GET https://api.github.com/repos/takeprofit83/second-brain/contents/Knowledge
+    (returns an array of {name, ...} in one call — no per-file fetch needed for this check)
+
+→ HTTP Request "Get Index" (same as 35.1/35.2)
+→ Code "Decode Index"
+
+→ Code "Compare"
+    filenames = list.filter(f => f.name.endsWith('.md') && !['index.md','log.md'].includes(f.name)).map(f => f.name)
+    missing_from_index = filenames not mentioned anywhere in the decoded index.md text
+    dangling_in_index  = page names referenced in index.md but absent from `filenames`
+    output: { missing_from_index, dangling_in_index }
+
+→ If missing_from_index.length > 0
+    → GitHub "Append Missing Entries" (edit index.md, append one generic line per missing
+      file — auto-fixable, mechanical, no judgment call involved)
+
+→ If dangling_in_index.length > 0
+    → GitHub "Upsert Lint Report" (edit-or-create Knowledge/lint-report.md, overwrite with
+      current dangling list + timestamp — report only, never auto-delete/merge index lines,
+      since "is this actually a duplicate topic or a legitimately renamed page" is a judgment
+      call this project's own principles reserve for human review, not automation)
+
+→ (either branch) GitHub "Append Log" (Knowledge/log.md: "{{$now}} | lint | fixed:N reported:M")
+```
+
+**Known scope gap, accepted for v1:** this does not detect broken `[[wikilinks]]` *inside* page bodies (e.g. a page linking to a topic that was later renamed) — that needs fetching every page's content, which means either a loop (rejected per ADR-010's reasoning) or `Split in Batches`. Revisit as a v2 only if `Knowledge/` grows large enough for this to become a real, observed problem — not preemptively.
+
+## Credentials needed (new)
+
+Two new Header-Auth credentials, same shape as the existing `atlas docs sync secret` / `atlas capture secret`: `atlas wiki ingest secret`, `atlas wiki query secret`. GitHub access reuses the existing credential already used by `Create a file`/`Edit a file` in `Atlas - Kie Adapter` and `Atlas - Docs Sync` — no new GitHub credential needed.
+
+## Status
+
+Design only. None of the three workflows exist in n8n yet. Per the write-restriction already documented in §31 ("Claude Code's own safety classifier blocked direct PUT/write calls... to production n8n"), building these requires the user to apply them via the n8n public API or UI, same pattern as every other workflow in this document.

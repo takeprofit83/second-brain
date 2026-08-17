@@ -316,6 +316,23 @@ Built via the n8n API (`POST /workflows`, creating all 9 nodes programmatically)
 
 ---
 
+# 2026-08-17 — Video research: "Wiki LLM" pattern (Karpathy) → Atlas Wiki Layer proposal
+
+User asked for transcription + an implementation summary of 3 YouTube videos on the "LLM Wiki" pattern (Andrej Karpathy's Obsidian+Claude Code "second brain" concept, popularized by two RU AI-automation channels): "Карпатый Wiki Вместо RAG — Полный Obsidian Сетап Для Новичка" (ИИшенка | AI Automation, 25 min), "Claude + Obsidian: Как создать ИИ-систему с абсолютной памятью" (AI Прорыв, 26 min), and a NotebookLM+Obsidian Short (@linkingyourthinking, <1 min). Full verbatim transcription wasn't obtainable: YouTube's `timedtext` endpoint returns `200` with an empty body for unauthenticated/simplified requests (confirmed across several param variants — dead end without a proper PO-token flow), and the sandboxed browser pane throttles/pauses JS timers when not composited, which blocked a live-caption-polling workaround for the Short. Used the two long videos' own detailed author-written timestamped chapter descriptions instead — rich enough for this purpose, arguably more useful than raw ASR text for an architecture summary. The Short's exact mechanism stayed unverified (only title/topic captured); flagged as such rather than guessed.
+
+**Core finding:** both longer videos describe the same pattern — a RAW / WIKI / SCHEMA folder split with three operations (`ingest`, `query`, `lint`), driven by Claude Code inside Obsidian, governed by a CLAUDE.md rule file. This maps closely onto Atlas's own already-pending gap: §17's "Context-loader (read side)" in `Atlas_Technical_Documentation.md`, explicitly logged as the next piece of unfinished work since 2026-07-28 (see this log's 2026-07-28 "the read side... is still manual" note).
+
+**Architecture decision (per this project's "Claude acts as system architect" convention — decided and stated, not offered as options):** add a `Wiki/` layer to `second-brain`, sibling to `Projects/`, `Courses/`, `Debates/` — `Wiki/index.md`, `Wiki/<topic>.md` pages (Obsidian `[[wikilink]]`-native, since the vault is already opened locally in Obsidian), `Wiki/log.md` audit trail. Three new n8n workflows, all reusing the existing adapter architecture rather than requiring a live Claude Code/Anthropic session:
+- `Atlas - Wiki Ingest` — fires after each conspect commit, turns new RAW/conspect content into wiki page updates (new/updated topic pages + `index.md`).
+- `Atlas - Wiki Query` — webhook (+ optional Telegram front-end), the piece that actually closes §17: a new chat session (any model, any platform) can fetch grounded context on demand instead of the user pasting the tech doc by hand.
+- `Atlas - Wiki Lint` — scheduled (cron), auto-fixes mechanical issues (missing index entries, broken `[[links]]`), reports (doesn't auto-merge) ambiguous ones (possible duplicate topics) to `Wiki/lint-report.md`.
+
+**Russia-specific deviation from the videos' literal setup:** the videos assume an interactive Claude Code terminal with unrestricted Anthropic access for all three operations — exactly the access problem Atlas's adapter architecture and the OpenRouter Russia-IP-block saga (`Atlas_Technical_Documentation.md` §6) already exist to solve. Decision: route all three new workflows through the existing OpenRouter/Polza adapters (already paid, already proven reachable from `nikita-vm`) instead of a live CLI session — cheap model (Kie `gemini-2.5-flash` or Polza YandexGPT) for Lint, Claude Sonnet 5 via OpenRouter for Ingest/Query. This also avoids needing an interactive coding agent to perform the production writes for routine maintenance at all, consistent with the write-restriction already documented in `Atlas_Technical_Documentation.md` §31 (Claude Code's own safety classifier blocks the agent from directly writing to production n8n/GitHub).
+
+Not built yet — this is a proposal, delivered to the user in chat, not implemented this session. Next step if approved: draft the three workflows' exact node specs (same level of detail as `Atlas - Docs Sync`'s webhook contract) for the user to apply via the n8n API, following the established pattern (agent prepares, user executes the actual production writes).
+
+---
+
 # User Preferences During Development
 
 - Short answers.

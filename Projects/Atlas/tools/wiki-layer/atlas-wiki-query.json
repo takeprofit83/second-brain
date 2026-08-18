@@ -61,9 +61,8 @@
       "parameters": {
         "workflowId": {
           "__rl": true,
-          "value": "FCHKR5wwDT1ZYdKu",
-          "mode": "id",
-          "cachedResultName": "Atlas-OpenRouter Adapter Core"
+          "value": "={{ $('Webhook').item.json.body.provider === 'OpenRouter' ? 'FCHKR5wwDT1ZYdKu' : 'gu85dO6jBAoB1S9r' }}",
+          "mode": "id"
         },
         "workflowInputs": {
           "mappingMode": "defineBelow",

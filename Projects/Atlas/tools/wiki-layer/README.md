@@ -6,6 +6,12 @@
 - `atlas-wiki-query.json` — вебхук, отвечает на вопрос по контексту `Knowledge/index.md`. Закрывает §17 (Context-loader).
 - `atlas-wiki-lint.json` — по крону (04:00 ежедневно), сверяет `index.md` со списком файлов в `Knowledge/`. Без единого LLM-вызова — чистое сравнение строк.
 
+## Провайдер (Ingest/Query)
+
+Оба вебхука принимают опциональное поле `provider` в теле запроса (`"OpenRouter"` | что угодно ещё/отсутствует → **Polza по умолчанию**), тем же паттерном, что и `On form submission`/`Atlas - Model Relay` (§23, §33). Дефолт — Polza, не OpenRouter: в этом проекте уже был реальный `402 INSUFFICIENT_BALANCE` именно из-за того, что новый воркфлоу по умолчанию бил в незапополненный OpenRouter (§32) — здесь эта ошибка не повторяется намеренно.
+
+**Не проверено:** доступна ли модель `anthropic/claude-sonnet-5` через Polza под тем же именем, что и на OpenRouter — в §32 через Polza тестировался только `yandex/yandexgpt-5-lite`. Если модель не найдётся, либо сменить `model` в ноде `Call Wiki Ingest LLM`/`Call Wiki Query LLM` на подтверждённо рабочую в каталоге Polza, либо явно передавать `"provider":"OpenRouter"` в запросе.
+
 ## Шаги после импорта каждого файла
 
 1. **Credentials.** У каждой ноды с `"id": "REPLACE_ME"` в блоке `credentials` — открыть ноду и выбрать реальный credential:
@@ -22,7 +28,7 @@
 
 ## Ручной тест без реального конспекта
 
-`Atlas - Wiki Ingest`:
+`Atlas - Wiki Ingest` (без `provider` → уйдёт в Polza):
 ```bash
 curl -X POST https://n8n.neiroclone.ru/webhook/atlas-wiki-ingest \
   -H "Content-Type: application/json" \
@@ -30,12 +36,12 @@ curl -X POST https://n8n.neiroclone.ru/webhook/atlas-wiki-ingest \
   -d '{"content":"Тестовый конспект про настройку n8n на Docker.","source_path":"manual-test"}'
 ```
 
-`Atlas - Wiki Query`:
+`Atlas - Wiki Query` (с явным `"provider":"OpenRouter"`):
 ```bash
 curl -X POST https://n8n.neiroclone.ru/webhook/atlas-wiki-query \
   -H "Content-Type: application/json" \
   -H "X-Atlas-Secret: <новый секрет>" \
-  -d '{"question":"Что такое Atlas?"}'
+  -d '{"question":"Что такое Atlas?","provider":"OpenRouter"}'
 ```
 
 `Atlas - Wiki Lint` — сработает по расписанию, либо запустить вручную кнопкой "Test workflow" в n8n UI.

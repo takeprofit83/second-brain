@@ -60,14 +60,16 @@ The user works across 6 projects in Second Brain:
 
 ## 5. Session Start Protocol (Context Resume — Run by Claude in Background)
 
-When a session starts or the user mentions a project in the desktop chat:
-1. In the background, run:
-   ```bash
-   python second-brain/tools/ai_os.py resume <project>
-   ```
-   *(Or read `second-brain/Projects/<project>/project_state.md` directly and run `git -C second-brain pull --rebase origin main`)*
-2. Pick up the `next_steps` queue immediately and start implementation in the codebase.
-3. Present the user with completed work, not a list of questions.
+> [!IMPORTANT]
+> **AT THE START OF EVERY SESSION / FIRST PROMPT:**
+> When the user opens Claude Desktop and sends a message (e.g. "Привет", "Продолжаем", "Что делаем?", or names a project):
+> 1. Silently read `second-brain/Projects/Atlas/project_state.md` (or inspect `second-brain/Projects/<project>/project_state.md`).
+> 2. You will immediately see what **Antigravity** (or the previous agent) just completed under `Recent Progress` and `last_agent`.
+> 3. Greet the user with a concise briefing:
+>    - *"Вижу последнюю работу [Antigravity/агента]: [краткая выжимка из Recent Progress]"*
+>    - *"Текущий приоритетный шаг: [из next_steps]"*
+> 4. Begin execution immediately or confirm readiness. **NEVER ask "What should I do next?"**.
+
 
 ---
 

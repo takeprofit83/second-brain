@@ -4,11 +4,11 @@
     "type": "split",
     "children": [
       {
-        "id": "ac436ad9f879ef65",
+        "id": "6c2236dfd7d5cca0",
         "type": "tabs",
         "children": [
           {
-            "id": "d5ea1a05b1a1caec",
+            "id": "830e74815a383754",
             "type": "leaf",
             "state": {
               "type": "graph",
@@ -181,8 +181,12 @@
       "bases:Создать новую базу": false
     }
   },
-  "active": "d5ea1a05b1a1caec",
+  "active": "830e74815a383754",
   "lastOpenFiles": [
+    "docs/AI_OS_CURRENT_STATE.md",
+    "Без названия.canvas",
+    "Projects/Other/logs/20261023-080744-chatgpt-6acd3b8b-7394-83eb-890c-f0c0f4303365.md",
+    "Projects/Other/logs/20261023-080744-chatgpt-6acd3b8b-7394-83eb-890c-f0c0f4303365-raw.md",
     "Projects/Other/logs/archive/20261023-032321-claude-3-5-sonnet-test-run-1792725803.md",
     "Projects/Other/logs/archive/20261023-032144-claude-3-5-sonnet-test-run-1792725705.md",
     "Projects/Other/logs/archive",
@@ -209,9 +213,6 @@
     "Projects/Atlas/logs/archive/20260817-024742.md",
     "Projects/Atlas/logs/archive/20260729-063447.md",
     "Projects/Atlas/logs/archive/20260728-conspect-session.md",
-    "Projects/Atlas/logs/archive/20260728-231025.md",
-    "Projects/Atlas/logs/archive/20260728-062150.md",
-    "Projects/Atlas/logs/archive",
-    "Projects/Atlas/logs/20261023-075254-chatgpt-6acd3b8b-7394-83eb-890c-f0c0f4303365.md"
+    "Projects/Atlas/logs/archive"
   ]
 }

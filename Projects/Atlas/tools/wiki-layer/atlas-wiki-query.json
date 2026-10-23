@@ -13,10 +13,16 @@
       "name": "Webhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [-900, 0],
-      "webhookId": "acc9d122-8772-a50d-5895-00733611ae78",
+      "position": [
+        -900,
+        0
+      ],
+      "webhookId": "c1a90101-7001-4001-8001-000000000003",
       "credentials": {
-        "httpHeaderAuth": { "id": "REPLACE_ME", "name": "atlas wiki query secret" }
+        "httpHeaderAuth": {
+          "id": "TtnD8wFLtpPtsP2Q",
+          "name": "atlas capture secret"
+        }
       }
     },
     {
@@ -25,16 +31,27 @@
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "githubApi",
         "options": {
-          "response": { "response": { "fullResponse": true, "neverError": true } }
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
         }
       },
       "id": "e0fec2e5-5e1c-2589-6526-cb9698a1fbd2",
       "name": "Get Index",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [-680, 0],
+      "position": [
+        -680,
+        0
+      ],
       "credentials": {
-        "githubApi": { "id": "REPLACE_ME", "name": "REPLACE WITH YOUR EXISTING GITHUB CREDENTIAL" }
+        "githubApi": {
+          "id": "weiRggkEa4tOfXAN",
+          "name": "atlas github token"
+        }
       }
     },
     {
@@ -45,7 +62,10 @@
       "name": "Decode Index",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [-460, 0]
+      "position": [
+        -460,
+        0
+      ]
     },
     {
       "parameters": {
@@ -55,7 +75,10 @@
       "name": "Build LLM Input",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [-240, 0]
+      "position": [
+        -240,
+        0
+      ]
     },
     {
       "parameters": {
@@ -69,7 +92,7 @@
           "value": {
             "user_input": "={{ $json.combined_input }}",
             "system_prompt": "Answer using ONLY the provided wiki index as context. Cite the page name(s) your answer draws on. If the index doesn't cover the question, say so explicitly instead of guessing.",
-            "model": "anthropic/claude-sonnet-5"
+            "model": "={{ $('Webhook').item.json.body.model || 'openai/gpt-4o-mini' }}"
           }
         }
       },
@@ -77,7 +100,10 @@
       "name": "Call Wiki Query LLM",
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.2,
-      "position": [-20, 0]
+      "position": [
+        -20,
+        0
+      ]
     },
     {
       "parameters": {
@@ -89,15 +115,70 @@
       "name": "Respond to Webhook",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.4,
-      "position": [200, 0]
+      "position": [
+        200,
+        0
+      ]
     }
   ],
   "connections": {
-    "Webhook": { "main": [[{ "node": "Get Index", "type": "main", "index": 0 }]] },
-    "Get Index": { "main": [[{ "node": "Decode Index", "type": "main", "index": 0 }]] },
-    "Decode Index": { "main": [[{ "node": "Build LLM Input", "type": "main", "index": 0 }]] },
-    "Build LLM Input": { "main": [[{ "node": "Call Wiki Query LLM", "type": "main", "index": 0 }]] },
-    "Call Wiki Query LLM": { "main": [[{ "node": "Respond to Webhook", "type": "main", "index": 0 }]] }
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Get Index",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Index": {
+      "main": [
+        [
+          {
+            "node": "Decode Index",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Decode Index": {
+      "main": [
+        [
+          {
+            "node": "Build LLM Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build LLM Input": {
+      "main": [
+        [
+          {
+            "node": "Call Wiki Query LLM",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Wiki Query LLM": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
   },
-  "settings": { "executionOrder": "v1" }
+  "settings": {
+    "executionOrder": "v1"
+  }
 }

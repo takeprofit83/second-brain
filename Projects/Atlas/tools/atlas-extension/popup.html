@@ -37,7 +37,7 @@
   }
   .nav-tabs {
     display: flex;
-    gap: 6px;
+    gap: 4px;
     background: #161b22;
     padding: 4px;
     border-radius: 8px;
@@ -47,11 +47,11 @@
   .nav-tab {
     flex: 1;
     text-align: center;
-    padding: 8px 10px;
+    padding: 7px 6px;
     border-radius: 6px;
     cursor: pointer;
     font-weight: 500;
-    font-size: 13px;
+    font-size: 12px;
     color: #8b949e;
     transition: all 0.15s;
   }
@@ -80,7 +80,7 @@
     margin-bottom: 14px;
   }
   .proj-btn {
-    padding: 10px 4px;
+    padding: 9px 4px;
     border-radius: 6px;
     border: none;
     font-weight: 600;
@@ -92,13 +92,17 @@
   }
   .proj-btn:hover { filter: brightness(1.15); transform: translateY(-1px); }
   .proj-btn:active { transform: translateY(1px); }
+  .proj-btn.selected {
+    box-shadow: 0 0 0 2px #fff, 0 0 8px rgba(255,255,255,0.4);
+    filter: brightness(1.2);
+  }
 
   .btn-primary {
     width: 100%;
-    padding: 12px;
+    padding: 11px;
     border-radius: 6px;
     border: none;
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 600;
     cursor: pointer;
     background: #238636;
@@ -179,6 +183,44 @@
     background: #1f6feb;
     color: #fff;
   }
+
+  /* Form controls for Report section */
+  .form-group {
+    margin-bottom: 10px;
+  }
+  .form-label {
+    display: block;
+    font-size: 11px;
+    font-weight: 600;
+    color: #8b949e;
+    margin-bottom: 4px;
+  }
+  .form-input, .form-textarea {
+    width: 100%;
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    color: #e6edf3;
+    padding: 7px 9px;
+    font-size: 12px;
+    font-family: inherit;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .form-input:focus, .form-textarea:focus {
+    border-color: #58a6ff;
+  }
+  .form-textarea {
+    resize: vertical;
+    min-height: 52px;
+  }
+  details summary {
+    cursor: pointer;
+    font-size: 11px;
+    color: #58a6ff;
+    margin-bottom: 8px;
+    user-select: none;
+  }
 </style>
 </head>
 <body>
@@ -186,7 +228,7 @@
 <div class="header">
   <div class="logo-title">
     <div class="logo-dot"></div>
-    <span>Atlas AI-OS Companion</span>
+    <span>Atlas AI-OS</span>
   </div>
   <span id="platform-badge" class="badge">Авто</span>
 </div>
@@ -194,6 +236,7 @@
 <div class="nav-tabs">
   <div class="nav-tab active" id="tab-resume-btn">📥 Подхватить</div>
   <div class="nav-tab" id="tab-capture-btn">📤 Захватить</div>
+  <div class="nav-tab" id="tab-report-btn">📝 Отчёт</div>
 </div>
 
 <!-- СЕКЦИЯ 1: ПОДХВАТ КОНТЕКСТА (RESUME) -->
@@ -247,6 +290,51 @@
       <button class="proj-btn" style="background:#8957e5" data-key="other">Другое</button>
     </div>
   </div>
+</div>
+
+<!-- СЕКЦИЯ 3: ОБРАТНАЯ ЗАПИСЬ ОТЧЁТА (REPORT & SAVE) -->
+<div class="section" id="sec-report">
+  <div style="font-size:12px; color:#8b949e; margin-bottom:8px;">1. Выберите проект:</div>
+  <div class="btn-grid" id="report-project-buttons">
+    <button class="proj-btn selected" style="background:#2a6df4" data-key="atlas">Atlas</button>
+    <button class="proj-btn" style="background:#2fa84f" data-key="courses">Курс</button>
+    <button class="proj-btn" style="background:#e6492d" data-key="dzen">Дзен</button>
+    <button class="proj-btn" style="background:#e0468c" data-key="nastya">Настя</button>
+    <button class="proj-btn" style="background:#d98c1f" data-key="dacha">Дача</button>
+    <button class="proj-btn" style="background:#8957e5" data-key="other">Другое</button>
+  </div>
+
+  <div class="form-group">
+    <label class="form-label">2. Что сделано (резюме сессии):</label>
+    <textarea class="form-textarea" id="report-summary" placeholder="Краткое описание выполненных задач..."></textarea>
+  </div>
+
+  <div class="form-group">
+    <label class="form-label">3. Следующий шаг (next step):</label>
+    <input class="form-input" id="report-next-step" type="text" placeholder="Конкретный шаг для следующего ИИ...">
+  </div>
+
+  <details>
+    <summary>Дополнительные поля и вставка JSON</summary>
+    <div class="form-group" style="margin-top:6px;">
+      <label class="form-label">Выполненные действия (по строкам):</label>
+      <textarea class="form-textarea" id="report-actions" rows="2" placeholder="Действие 1&#10;Действие 2"></textarea>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Принятые решения:</label>
+      <input class="form-input" id="report-decisions" type="text" placeholder="Решение или ADR...">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Или вставьте полный JSON-отчёт ИИ:</label>
+      <textarea class="form-textarea" id="report-raw-json" rows="3" placeholder='{"project_id":"atlas","summary":"...","next_step":"..."}'></textarea>
+    </div>
+  </details>
+
+  <button class="btn-primary" id="btn-submit-report" style="margin-top:8px;">
+    🚀 Сохранить отчёт в Second Brain
+  </button>
+
+  <div id="report-status-box" class="status-box" style="display:none; margin-top:10px;"></div>
 </div>
 
 <script src="popup.js"></script>

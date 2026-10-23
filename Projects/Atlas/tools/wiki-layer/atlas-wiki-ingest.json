@@ -13,10 +13,16 @@
       "name": "Webhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [-1400, 0],
-      "webhookId": "066d4b2a-3183-ccfa-c3a7-7783e4ff16c5",
+      "position": [
+        -1400,
+        0
+      ],
+      "webhookId": "c1a90101-7001-4001-8001-000000000004",
       "credentials": {
-        "httpHeaderAuth": { "id": "REPLACE_ME", "name": "atlas wiki ingest secret" }
+        "httpHeaderAuth": {
+          "id": "TtnD8wFLtpPtsP2Q",
+          "name": "atlas capture secret"
+        }
       }
     },
     {
@@ -25,16 +31,27 @@
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "githubApi",
         "options": {
-          "response": { "response": { "fullResponse": true, "neverError": true } }
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
         }
       },
       "id": "ca624d3e-4c52-503d-5b01-51e4587285e3",
       "name": "Get Index",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [-1180, 0],
+      "position": [
+        -1180,
+        0
+      ],
       "credentials": {
-        "githubApi": { "id": "REPLACE_ME", "name": "REPLACE WITH YOUR EXISTING GITHUB CREDENTIAL" }
+        "githubApi": {
+          "id": "weiRggkEa4tOfXAN",
+          "name": "atlas github token"
+        }
       }
     },
     {
@@ -45,7 +62,10 @@
       "name": "Decode Index",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [-960, 0]
+      "position": [
+        -960,
+        0
+      ]
     },
     {
       "parameters": {
@@ -55,7 +75,10 @@
       "name": "Build LLM Input",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [-740, 0]
+      "position": [
+        -740,
+        0
+      ]
     },
     {
       "parameters": {
@@ -69,7 +92,7 @@
           "value": {
             "user_input": "={{ $json.combined_input }}",
             "system_prompt": "Given the current wiki index and one new conspect, decide ONE topic page to create or update (not several). Output STRICT JSON only, no markdown code fences, no extra text: {\"page_path\": \"Knowledge/<slug>.md\", \"page_title\": \"...\", \"page_content\": \"<full markdown page, use [[wikilink]] syntax for references to other Knowledge/ pages>\", \"index_line\": \"<one markdown list line for index.md>\"}. <slug> must be lowercase-kebab-case, ASCII only (transliterate Russian if needed). If the conspect doesn't warrant a new page, still pick the closest existing page from the index and update it rather than skipping - always return exactly one page.",
-            "model": "anthropic/claude-sonnet-5"
+            "model": "={{ $('Webhook').item.json.body.model || 'openai/gpt-4o-mini' }}"
           }
         }
       },
@@ -77,7 +100,10 @@
       "name": "Call Wiki Ingest LLM",
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.2,
-      "position": [-520, 0]
+      "position": [
+        -520,
+        0
+      ]
     },
     {
       "parameters": {
@@ -87,7 +113,10 @@
       "name": "Parse LLM JSON",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [-300, 0]
+      "position": [
+        -300,
+        0
+      ]
     },
     {
       "parameters": {
@@ -95,28 +124,46 @@
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "githubApi",
         "options": {
-          "response": { "response": { "fullResponse": true, "neverError": true } }
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
         }
       },
       "id": "36c58a67-ee06-dc46-2d61-1527dcc4e574",
       "name": "Check Page Exists",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [-80, 0],
+      "position": [
+        -80,
+        0
+      ],
       "credentials": {
-        "githubApi": { "id": "REPLACE_ME", "name": "REPLACE WITH YOUR EXISTING GITHUB CREDENTIAL" }
+        "githubApi": {
+          "id": "weiRggkEa4tOfXAN",
+          "name": "atlas github token"
+        }
       }
     },
     {
       "parameters": {
         "conditions": {
-          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
           "conditions": [
             {
               "id": "844a3faa-e996-ffd6-193c-b6d33c7e8311",
               "leftValue": "={{ $json.statusCode }}",
               "rightValue": 200,
-              "operator": { "type": "number", "operation": "equals" }
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
             }
           ],
           "combinator": "and"
@@ -127,14 +174,25 @@
       "name": "Page Exists?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
-      "position": [140, 0]
+      "position": [
+        140,
+        0
+      ]
     },
     {
       "parameters": {
         "resource": "file",
         "operation": "edit",
-        "owner": { "__rl": true, "value": "takeprofit83", "mode": "list" },
-        "repository": { "__rl": true, "value": "second-brain", "mode": "list" },
+        "owner": {
+          "__rl": true,
+          "value": "takeprofit83",
+          "mode": "list"
+        },
+        "repository": {
+          "__rl": true,
+          "value": "second-brain",
+          "mode": "list"
+        },
         "filePath": "={{ $('Parse LLM JSON').item.json.page_path }}",
         "fileContent": "={{ $('Parse LLM JSON').item.json.page_content }}",
         "commitMessage": "=wiki: update {{ $('Parse LLM JSON').item.json.page_path }}"
@@ -143,17 +201,31 @@
       "name": "Edit Page",
       "type": "n8n-nodes-base.github",
       "typeVersion": 1.1,
-      "position": [360, -120],
+      "position": [
+        360,
+        -120
+      ],
       "credentials": {
-        "githubApi": { "id": "REPLACE_ME", "name": "REPLACE WITH YOUR EXISTING GITHUB CREDENTIAL" }
+        "githubApi": {
+          "id": "weiRggkEa4tOfXAN",
+          "name": "atlas github token"
+        }
       }
     },
     {
       "parameters": {
         "resource": "file",
         "operation": "create",
-        "owner": { "__rl": true, "value": "takeprofit83", "mode": "list" },
-        "repository": { "__rl": true, "value": "second-brain", "mode": "list" },
+        "owner": {
+          "__rl": true,
+          "value": "takeprofit83",
+          "mode": "list"
+        },
+        "repository": {
+          "__rl": true,
+          "value": "second-brain",
+          "mode": "list"
+        },
         "filePath": "={{ $('Parse LLM JSON').item.json.page_path }}",
         "fileContent": "={{ $('Parse LLM JSON').item.json.page_content }}",
         "commitMessage": "=wiki: create {{ $('Parse LLM JSON').item.json.page_path }}"
@@ -162,9 +234,15 @@
       "name": "Create Page",
       "type": "n8n-nodes-base.github",
       "typeVersion": 1.1,
-      "position": [360, 120],
+      "position": [
+        360,
+        120
+      ],
       "credentials": {
-        "githubApi": { "id": "REPLACE_ME", "name": "REPLACE WITH YOUR EXISTING GITHUB CREDENTIAL" }
+        "githubApi": {
+          "id": "weiRggkEa4tOfXAN",
+          "name": "atlas github token"
+        }
       }
     },
     {
@@ -173,16 +251,27 @@
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "githubApi",
         "options": {
-          "response": { "response": { "fullResponse": true, "neverError": true } }
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
         }
       },
       "id": "c1bc2880-5993-3523-121c-197f9baf6e2b",
       "name": "Get Index Fresh",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [580, 0],
+      "position": [
+        580,
+        0
+      ],
       "credentials": {
-        "githubApi": { "id": "REPLACE_ME", "name": "REPLACE WITH YOUR EXISTING GITHUB CREDENTIAL" }
+        "githubApi": {
+          "id": "weiRggkEa4tOfXAN",
+          "name": "atlas github token"
+        }
       }
     },
     {
@@ -193,14 +282,25 @@
       "name": "Append Index Line",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [800, 0]
+      "position": [
+        800,
+        0
+      ]
     },
     {
       "parameters": {
         "resource": "file",
         "operation": "edit",
-        "owner": { "__rl": true, "value": "takeprofit83", "mode": "list" },
-        "repository": { "__rl": true, "value": "second-brain", "mode": "list" },
+        "owner": {
+          "__rl": true,
+          "value": "takeprofit83",
+          "mode": "list"
+        },
+        "repository": {
+          "__rl": true,
+          "value": "second-brain",
+          "mode": "list"
+        },
         "filePath": "Knowledge/index.md",
         "fileContent": "={{ $json.new_index_content }}",
         "commitMessage": "=wiki: index += {{ $('Parse LLM JSON').item.json.page_path }}"
@@ -209,9 +309,15 @@
       "name": "Edit Index",
       "type": "n8n-nodes-base.github",
       "typeVersion": 1.1,
-      "position": [1020, 0],
+      "position": [
+        1020,
+        0
+      ],
       "credentials": {
-        "githubApi": { "id": "REPLACE_ME", "name": "REPLACE WITH YOUR EXISTING GITHUB CREDENTIAL" }
+        "githubApi": {
+          "id": "weiRggkEa4tOfXAN",
+          "name": "atlas github token"
+        }
       }
     },
     {
@@ -220,16 +326,27 @@
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "githubApi",
         "options": {
-          "response": { "response": { "fullResponse": true, "neverError": true } }
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
         }
       },
       "id": "12c2980b-ca57-188f-9888-78d537b5c0f8",
       "name": "Get Log Fresh",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1240, 0],
+      "position": [
+        1240,
+        0
+      ],
       "credentials": {
-        "githubApi": { "id": "REPLACE_ME", "name": "REPLACE WITH YOUR EXISTING GITHUB CREDENTIAL" }
+        "githubApi": {
+          "id": "weiRggkEa4tOfXAN",
+          "name": "atlas github token"
+        }
       }
     },
     {
@@ -240,14 +357,25 @@
       "name": "Append Log Line",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1460, 0]
+      "position": [
+        1460,
+        0
+      ]
     },
     {
       "parameters": {
         "resource": "file",
         "operation": "edit",
-        "owner": { "__rl": true, "value": "takeprofit83", "mode": "list" },
-        "repository": { "__rl": true, "value": "second-brain", "mode": "list" },
+        "owner": {
+          "__rl": true,
+          "value": "takeprofit83",
+          "mode": "list"
+        },
+        "repository": {
+          "__rl": true,
+          "value": "second-brain",
+          "mode": "list"
+        },
         "filePath": "Knowledge/log.md",
         "fileContent": "={{ $json.new_log_content }}",
         "commitMessage": "wiki: log ingest"
@@ -256,9 +384,15 @@
       "name": "Edit Log",
       "type": "n8n-nodes-base.github",
       "typeVersion": 1.1,
-      "position": [1680, 0],
+      "position": [
+        1680,
+        0
+      ],
       "credentials": {
-        "githubApi": { "id": "REPLACE_ME", "name": "REPLACE WITH YOUR EXISTING GITHUB CREDENTIAL" }
+        "githubApi": {
+          "id": "weiRggkEa4tOfXAN",
+          "name": "atlas github token"
+        }
       }
     },
     {
@@ -271,31 +405,198 @@
       "name": "Respond to Webhook",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.4,
-      "position": [1900, 0]
+      "position": [
+        1900,
+        0
+      ]
     }
   ],
   "connections": {
-    "Webhook": { "main": [[{ "node": "Get Index", "type": "main", "index": 0 }]] },
-    "Get Index": { "main": [[{ "node": "Decode Index", "type": "main", "index": 0 }]] },
-    "Decode Index": { "main": [[{ "node": "Build LLM Input", "type": "main", "index": 0 }]] },
-    "Build LLM Input": { "main": [[{ "node": "Call Wiki Ingest LLM", "type": "main", "index": 0 }]] },
-    "Call Wiki Ingest LLM": { "main": [[{ "node": "Parse LLM JSON", "type": "main", "index": 0 }]] },
-    "Parse LLM JSON": { "main": [[{ "node": "Check Page Exists", "type": "main", "index": 0 }]] },
-    "Check Page Exists": { "main": [[{ "node": "Page Exists?", "type": "main", "index": 0 }]] },
-    "Page Exists?": {
+    "Webhook": {
       "main": [
-        [{ "node": "Edit Page", "type": "main", "index": 0 }],
-        [{ "node": "Create Page", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Get Index",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
-    "Edit Page": { "main": [[{ "node": "Get Index Fresh", "type": "main", "index": 0 }]] },
-    "Create Page": { "main": [[{ "node": "Get Index Fresh", "type": "main", "index": 0 }]] },
-    "Get Index Fresh": { "main": [[{ "node": "Append Index Line", "type": "main", "index": 0 }]] },
-    "Append Index Line": { "main": [[{ "node": "Edit Index", "type": "main", "index": 0 }]] },
-    "Edit Index": { "main": [[{ "node": "Get Log Fresh", "type": "main", "index": 0 }]] },
-    "Get Log Fresh": { "main": [[{ "node": "Append Log Line", "type": "main", "index": 0 }]] },
-    "Append Log Line": { "main": [[{ "node": "Edit Log", "type": "main", "index": 0 }]] },
-    "Edit Log": { "main": [[{ "node": "Respond to Webhook", "type": "main", "index": 0 }]] }
+    "Get Index": {
+      "main": [
+        [
+          {
+            "node": "Decode Index",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Decode Index": {
+      "main": [
+        [
+          {
+            "node": "Build LLM Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build LLM Input": {
+      "main": [
+        [
+          {
+            "node": "Call Wiki Ingest LLM",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Wiki Ingest LLM": {
+      "main": [
+        [
+          {
+            "node": "Parse LLM JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse LLM JSON": {
+      "main": [
+        [
+          {
+            "node": "Check Page Exists",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Page Exists": {
+      "main": [
+        [
+          {
+            "node": "Page Exists?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Page Exists?": {
+      "main": [
+        [
+          {
+            "node": "Edit Page",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create Page",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Page": {
+      "main": [
+        [
+          {
+            "node": "Get Index Fresh",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Page": {
+      "main": [
+        [
+          {
+            "node": "Get Index Fresh",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Index Fresh": {
+      "main": [
+        [
+          {
+            "node": "Append Index Line",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append Index Line": {
+      "main": [
+        [
+          {
+            "node": "Edit Index",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Index": {
+      "main": [
+        [
+          {
+            "node": "Get Log Fresh",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Log Fresh": {
+      "main": [
+        [
+          {
+            "node": "Append Log Line",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append Log Line": {
+      "main": [
+        [
+          {
+            "node": "Edit Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Log": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
   },
-  "settings": { "executionOrder": "v1" }
+  "settings": {
+    "executionOrder": "v1"
+  }
 }

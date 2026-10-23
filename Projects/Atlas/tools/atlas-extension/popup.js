@@ -1,12 +1,16 @@
 (function() {
   const N8N_RESUME_URL  = 'https://n8n.neiroclone.ru/webhook/atlas-context-resume';
   const N8N_CAPTURE_URL = 'https://n8n.neiroclone.ru/webhook/atlas-capture';
+  const N8N_SAVE_URL    = 'https://n8n.neiroclone.ru/webhook/atlas-reverse-save';
   const WEBHOOK_SECRET  = '4a1cc5534eab63ca1ffebb4346c749551e994450e8b9d7fb';
 
+  // Navigation
   const tabResumeBtn  = document.getElementById('tab-resume-btn');
   const tabCaptureBtn = document.getElementById('tab-capture-btn');
+  const tabReportBtn  = document.getElementById('tab-report-btn');
   const secResume     = document.getElementById('sec-resume');
   const secCapture    = document.getElementById('sec-capture');
+  const secReport     = document.getElementById('sec-report');
 
   const badgeEl        = document.getElementById('platform-badge');
   const resumeStatus   = document.getElementById('resume-status');
@@ -19,25 +23,32 @@
   const btnReadChat   = document.getElementById('btn-read-chat');
   const capturePicker = document.getElementById('capture-picker');
 
+  // Report elements
+  const reportSummary  = document.getElementById('report-summary');
+  const reportNextStep = document.getElementById('report-next-step');
+  const reportActions  = document.getElementById('report-actions');
+  const reportDecisions = document.getElementById('report-decisions');
+  const reportRawJson  = document.getElementById('report-raw-json');
+  const btnSubmitReport = document.getElementById('btn-submit-report');
+  const reportStatusBox = document.getElementById('report-status-box');
+
   let activeTab = null;
   let activePlatform = null;
   let loadedPrompt = '';
   let capturedPayload = null;
+  let selectedReportProject = 'atlas';
 
   // 1. Управление вкладками
-  tabResumeBtn.addEventListener('click', () => {
-    tabResumeBtn.classList.add('active');
-    tabCaptureBtn.classList.remove('active');
-    secResume.classList.add('active');
-    secCapture.classList.remove('active');
-  });
+  function showTab(activeTabEl, activeSecEl) {
+    [tabResumeBtn, tabCaptureBtn, tabReportBtn].forEach(t => t.classList.remove('active'));
+    [secResume, secCapture, secReport].forEach(s => s.classList.remove('active'));
+    activeTabEl.classList.add('active');
+    activeSecEl.classList.add('active');
+  }
 
-  tabCaptureBtn.addEventListener('click', () => {
-    tabCaptureBtn.classList.add('active');
-    tabResumeBtn.classList.remove('active');
-    secCapture.classList.add('active');
-    secResume.classList.remove('active');
-  });
+  tabResumeBtn.addEventListener('click', () => showTab(tabResumeBtn, secResume));
+  tabCaptureBtn.addEventListener('click', () => showTab(tabCaptureBtn, secCapture));
+  tabReportBtn.addEventListener('click', () => showTab(tabReportBtn, secReport));
 
   // 2. Определение активной вкладки и сайта
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
@@ -97,39 +108,35 @@
     .then(res => res.json().then(data => ({ ok: res.ok, data })))
     .then(({ ok, data }) => {
       if (!ok || data.status === 'error') {
-        throw new Error(data.message || 'Ошибка сервера');
+        throw new Error(data.message || 'Ошибка загрузки контекста');
       }
-      loadedPrompt = data.prompt;
-      resumeStatus.innerHTML = `✅ Контекст актуален и готов к передаче.`;
+
+      loadedPrompt = data.prompt || '';
+      resumeStatus.innerHTML = `✅ Контекст для <b>${data.projectTitle || label}</b> получен!`;
+
       resumeMeta.innerHTML = `
-        <div class="meta-title">${data.projectTitle || label}</div>
-        <div class="meta-detail"><b>Файл:</b> ${data.filename || '—'}</div>
-        <div class="meta-detail"><b>Обновлено:</b> ${data.updatedAt || 'недавно'}</div>
-        <div class="meta-detail"><b>Объём:</b> ~${Math.round((data.contentLength || 0) / 1000)} тыс. знаков</div>
+        <div class="meta-title">📄 ${data.filename || 'Лог сессии'}</div>
+        <div class="meta-detail"><b>Дата:</b> ${data.updatedAt || 'не указана'}</div>
+        <div class="meta-detail"><b>Размер:</b> ${data.contentLength ? data.contentLength + ' символов' : ''}</div>
       `;
       resumeActions.style.display = 'block';
 
-      // Автоматическое копирование при загрузке
-      navigator.clipboard.writeText(loadedPrompt).then(() => {
-        btnCopyContext.textContent = '✅ СКОПИРОВАНО В БУФЕР!';
-        btnCopyContext.style.background = '#1f6feb';
-      }).catch(() => {});
+      // Автокопирование
+      navigator.clipboard.writeText(loadedPrompt).catch(() => {});
     })
     .catch(err => {
-      resumeStatus.innerHTML = `❌ Ошибка: ${err.message}`;
+      resumeStatus.innerHTML = `❌ Не удалось получить контекст: ${err.message}`;
     });
   });
 
-  // Кнопка «Скопировать в буфер»
   btnCopyContext.addEventListener('click', () => {
     if (!loadedPrompt) return;
     navigator.clipboard.writeText(loadedPrompt).then(() => {
-      btnCopyContext.textContent = '✅ СКОПИРОВАНО! (Ctrl+V)';
-      btnCopyContext.style.background = '#1f6feb';
+      btnCopyContext.textContent = '✅ Скопировано в буфер!';
+      setTimeout(() => btnCopyContext.textContent = '📋 Скопировать в буфер', 1500);
     });
   });
 
-  // Кнопка «Вставить прямо в чат»
   btnInjectContext.addEventListener('click', () => {
     if (!loadedPrompt || !activeTab) return;
     btnInjectContext.innerHTML = '<span class="spinner"></span> Вставляю…';
@@ -196,7 +203,6 @@
     });
   });
 
-  // Клик по проекту для сохранения захваченного диалога
   document.getElementById('capture-buttons').addEventListener('click', (e) => {
     const btn = e.target.closest('button[data-key]');
     if (!btn || !capturedPayload) return;
@@ -230,6 +236,109 @@
     })
     .catch(err => {
       captureStatus.innerHTML = `❌ Ошибка сети: ${err.message}`;
+    });
+  });
+
+  // 5. Логика ОБРАТНОЙ ЗАПИСИ ОТЧЁТА (REPORT & SAVE)
+  document.getElementById('report-project-buttons').addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-key]');
+    if (!btn) return;
+    document.querySelectorAll('#report-project-buttons .proj-btn').forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+    selectedReportProject = btn.getAttribute('data-key');
+  });
+
+  // Автопарсинг вставленного JSON
+  reportRawJson.addEventListener('input', () => {
+    const raw = reportRawJson.value.trim();
+    if (!raw.startsWith('{') || !raw.endsWith('}')) return;
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed.project_id) {
+        selectedReportProject = parsed.project_id.toLowerCase();
+        document.querySelectorAll('#report-project-buttons .proj-btn').forEach(b => {
+          b.classList.toggle('selected', b.getAttribute('data-key') === selectedReportProject);
+        });
+      }
+      if (parsed.summary) reportSummary.value = parsed.summary;
+      if (parsed.next_step) reportNextStep.value = parsed.next_step;
+      if (Array.isArray(parsed.completed_actions)) reportActions.value = parsed.completed_actions.join('\n');
+      if (Array.isArray(parsed.decisions_made)) {
+        reportDecisions.value = parsed.decisions_made.map(d => typeof d === 'string' ? d : d.title).join('; ');
+      }
+      reportStatusBox.style.display = 'block';
+      reportStatusBox.innerHTML = '✨ JSON успешно распознан и поля заполнены!';
+    } catch(e) {}
+  });
+
+  btnSubmitReport.addEventListener('click', () => {
+    const summary = reportSummary.value.trim();
+    const nextStep = reportNextStep.value.trim();
+
+    if (!summary) {
+      alert('Пожалуйста, заполните резюме выполненной работы.');
+      reportSummary.focus();
+      return;
+    }
+
+    btnSubmitReport.disabled = true;
+    btnSubmitReport.innerHTML = '<span class="spinner"></span> Отправка в Second Brain…';
+    reportStatusBox.style.display = 'block';
+    reportStatusBox.innerHTML = 'Передача отчёта в n8n…';
+
+    const rawActions = reportActions.value.trim();
+    const completedActions = rawActions ? rawActions.split('\n').map(s => s.replace(/^-\s*(\[x\])?\s*/i, '').trim()).filter(Boolean) : [];
+
+    const rawDecisions = reportDecisions.value.trim();
+    const decisionsMade = rawDecisions ? rawDecisions.split(';').map(s => ({ title: s.trim() })).filter(d => d.title) : [];
+
+    const payload = {
+      project_id: selectedReportProject,
+      source_ai: activePlatform || 'companion-extension',
+      summary: summary,
+      completed_actions: completedActions,
+      decisions_made: decisionsMade,
+      next_step: nextStep || 'Продолжить выполнение по плану проекта.'
+    };
+
+    fetch(N8N_SAVE_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Atlas-Secret': WEBHOOK_SECRET
+      },
+      body: JSON.stringify(payload)
+    })
+    .then(res => res.json().then(data => ({ ok: res.ok, data })))
+    .then(({ ok, data }) => {
+      btnSubmitReport.disabled = false;
+      btnSubmitReport.textContent = '🚀 Сохранить отчёт в Second Brain';
+
+      if (!ok || !data.success) {
+        throw new Error(data.error || 'Ошибка при сохранении отчёта');
+      }
+
+      reportStatusBox.style.display = 'block';
+      reportStatusBox.innerHTML = `
+        <div style="color:#3fb950; font-weight:600; margin-bottom:4px;">✅ Отчёт успешно сохранён!</div>
+        <div style="font-size:11px; color:#8b949e; word-break:break-all;">
+          <b>Файл:</b> ${data.log_path}<br>
+          <b>SHA:</b> ${data.commit_sha ? data.commit_sha.substring(0, 7) : 'ok'}
+        </div>
+      `;
+      setTimeout(() => {
+        reportSummary.value = '';
+        reportNextStep.value = '';
+        reportActions.value = '';
+        reportDecisions.value = '';
+        reportRawJson.value = '';
+      }, 1500);
+    })
+    .catch(err => {
+      btnSubmitReport.disabled = false;
+      btnSubmitReport.textContent = '🚀 Сохранить отчёт в Second Brain';
+      reportStatusBox.style.display = 'block';
+      reportStatusBox.innerHTML = `<span style="color:#f85149">❌ Ошибка: ${err.message}</span>`;
     });
   });
 })();

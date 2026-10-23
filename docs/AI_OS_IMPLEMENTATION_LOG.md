@@ -44,3 +44,29 @@
   - `Projects/Other/project_state.md`
 - Все 6 файлов прошли автоматическую валидацию через `scratch/validate_states.py`.
 - Статус Фазы B: **COMPLETED (PASS)**.
+
+#### Фаза C & F: Двусторонний цикл передачи контекста и обратной записи (Reverse Save)
+- Спроектирован и развёрнут в n8n боевой воркфлоу `Atlas - Reverse Save` (ID `RvSrV06jBAoB1S9r`):
+  - Принимает стандартизированные отчёты ИИ через вебхук `https://n8n.neiroclone.ru/webhook/atlas-reverse-save` (POST) с авторизацией по `X-Atlas-Secret`.
+  - Валидирует `project_id`, `summary`, `completed_actions`, `next_step` и опциональные метаданные.
+  - Форматирует структурированный Markdown-отчёт с временной меткой `YYYYMMDD-HHmmss`.
+  - Атомарно сохраняет отчёт в репозиторий `takeprofit83/second-brain` через GitHub Contents API.
+- Исправлен маппинг проектов в боевых воркфлоу n8n:
+  - В `Atlas - Kie Adapter` (`ls5hJoxIFtUycpKH`) добавлен маппинг для `dzen` и `other`.
+  - В `Atlas - Context Resume` (`TyMCUfCLua060sdc`) добавлен маппинг для `dzen` и `other`.
+- Проведено боевое тестирование:
+  - Тестовый отчёт успешно отправлен в проект `other` -> создан файл `Projects/Other/logs/20261023-031312-gemini-lead-architect-integration-test-01.md`.
+  - Тестовый отчёт успешно отправлен в проект `dzen` -> создан файл `Projects/Dzen/logs/20261023-031536-gemini-lead-architect-init-dzen-01.md`.
+  - Запрос `atlas-context-resume` подтвердил подхват созданных файлов и корректную генерацию handoff-промпта.
+  - Изменения синхронизированы в локальный репозиторий через Git fast-forward.
+- Статус Фазы C & F: **COMPLETED (PASS)**.
+
+#### Фаза D: Единый доступ к знаниям и Wiki-слой (Wiki Query & Ingest)
+- Настроены и привязаны боевые credentials для воркфлоу wiki-слоя:
+  - `atlas github token` (`weiRggkEa4tOfXAN`) для доступа к `Knowledge/index.md` и страницам базы знаний.
+  - `atlas capture secret` (`TtnD8wFLtpPtsP2Q`) для авторизации по заголовку `X-Atlas-Secret`.
+- Развёрнуты и активированы в проде воркфлоу n8n:
+  - `Atlas - Wiki Query` (`WkQyV06jBAoB1S9r`), вебхук `https://n8n.neiroclone.ru/webhook/atlas-wiki-query`.
+  - `Atlas - Wiki Ingest` (`WkIgV06jBAoB1S9r`), вебхук `https://n8n.neiroclone.ru/webhook/atlas-wiki-ingest`.
+- Проведён проверочный тест: отправлен контрольный вопрос к `atlas-wiki-query`, получен корректный статус 200 OK с проверкой по `Knowledge/index.md`.
+- Статус Фазы D: **COMPLETED (PASS)**.

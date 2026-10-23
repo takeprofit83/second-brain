@@ -1,0 +1,13 @@
+{
+  "legacyEditor": false,
+  "livePreview": true,
+  "showLineNumber": true,
+  "autoPairMarkdown": true,
+  "useTab": false,
+  "tabSize": 2,
+  "spellcheck": false,
+  "attachmentFolderPath": "Resources",
+  "newFileFolderPath": "Projects/Atlas/logs",
+  "newFileLocation": "folder",
+  "useMarkdownLinks": false
+}

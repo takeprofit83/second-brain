@@ -1,4 +1,11 @@
 ---
+type: memory
+tier: 1
+ai_read: true
+tags:
+  - memory
+  - moc
+  - core
 project: "atlas"
 status: "active"
 updated_at: "2026-10-23T08:58:10.468596"

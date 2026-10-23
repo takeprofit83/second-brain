@@ -1,4 +1,11 @@
 ---
+type: memory
+tier: 1
+ai_read: true
+tags:
+  - memory
+  - moc
+  - core
 project_id: "dacha"
 title: "Проект Дача"
 target_goal: "Управление строительством, благоустройством, умным домом и ботами загородного дома (Дачи)."

@@ -1,4 +1,11 @@
 ---
+type: memory
+tier: 1
+ai_read: true
+tags:
+  - memory
+  - moc
+  - core
 project_id: "courses"
 title: "Courses & Education"
 target_goal: "База знаний, конспекты учебных курсов, материалов и сессий изучения технологий."

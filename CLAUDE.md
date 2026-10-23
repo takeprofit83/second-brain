@@ -15,7 +15,30 @@ The canonical Single Source of Truth (SSOT) is the version-controlled `second-br
 
 ---
 
-## 2. Supported Projects & Paths
+## 2. TOKEN ECONOMY & TIERED MEMORY RULE (READ SHARED MEMORY, NEVER ALL LOGS)
+
+> [!CAUTION]
+> **STRICT BAN ON BULK READING HISTORICAL LOGS.**
+> To conserve tokens, avoid hallucinations, and keep context lean, agents MUST NEVER scan, grep, or concatenate all historical files in `logs/` or `Courses/*-raw.md`.
+
+We strictly follow the Obsidian 3-Tier Memory Standard:
+- **Tier 1 (Core Shared Memory / MOC — Always Read at Start):**
+  - Frontmatter: `type: memory`, `tier: 1`, `ai_read: true`, `tags: [memory, moc, core]`
+  - Files: `Projects/<project>/project_state.md` (and `Dashboard.md`).
+  - Contains the entire distilled current state, blockers, and `next_steps` queue (< 150 lines / ~1,200 tokens).
+  - This is your Single Source of Truth. Read ONLY this file at session start.
+- **Tier 2 (Reference Knowledge — Read Strictly On-Demand):**
+  - Frontmatter: `type: knowledge`, `tier: 2`, `ai_read: on_demand`
+  - Files: `Knowledge/*.md`, `docs/DECISIONS.md`.
+  - Read ONLY if explicitly referenced via a `[[wikilink]]` from `project_state.md` and required for the current task.
+- **Tier 3 (Raw History / Logs — NEVER READ IN BULK):**
+  - Frontmatter: `type: log`, `tier: 3`, `ai_read: false`, `tags: [log, archive]`
+  - Files: `Projects/<project>/logs/*.md`.
+  - Append-only write archive. Never load multiple past logs. At most, read the single latest log if needed for immediate continuity.
+
+---
+
+## 3. Supported Projects & Paths
 
 The user works across 6 projects in Second Brain:
 - **Atlas** (`atlas`): `second-brain/Projects/Atlas/` — AI-OS platform, n8n automations, extension, tools.
@@ -25,13 +48,9 @@ The user works across 6 projects in Second Brain:
 - **Dacha** (`dacha`): `second-brain/Projects/Dacha/` — country house automation, VK/Telegram bots.
 - **Other** (`other`): `second-brain/Projects/Other/` — isolated experiments & new ideas.
 
-Each project contains:
-- `project_state.md`: The active contract with `status`, `updated_at`, `current_state`, `active_blockers`, and `next_steps`.
-- `logs/`: Timestamped session logs (`YYYYMMDD-HHmmss-<agent>-<task>.md`).
-
 ---
 
-## 3. Autonomous Execution Protocol (No "What should I do next?")
+## 4. Autonomous Execution Protocol (No "What should I do next?")
 
 1. **Never ask the user technical coordination questions** or "What should I do next?".
 2. You act as the lead implementation engineer and systems architect.
@@ -39,20 +58,20 @@ Each project contains:
 
 ---
 
-## 4. Session Start Protocol (Context Resume — Run by Claude in Background)
+## 5. Session Start Protocol (Context Resume — Run by Claude in Background)
 
 When a session starts or the user mentions a project in the desktop chat:
 1. In the background, run:
    ```bash
    python second-brain/tools/ai_os.py resume <project>
    ```
-   *(Or read `second-brain/Projects/<project>/project_state.md` and run `git -C second-brain pull --rebase origin main`)*
+   *(Or read `second-brain/Projects/<project>/project_state.md` directly and run `git -C second-brain pull --rebase origin main`)*
 2. Pick up the `next_steps` queue immediately and start implementation in the codebase.
 3. Present the user with completed work, not a list of questions.
 
 ---
 
-## 5. Session Completion Protocol (Shared Memory Save — Run by Claude in Background)
+## 6. Session Completion Protocol (Shared Memory Save — Run by Claude in Background)
 
 When completing a task, reaching a milestone, or when conversation context is high:
 1. **Never leave work uncommitted.**
@@ -60,19 +79,5 @@ When completing a task, reaching a milestone, or when conversation context is hi
    ```bash
    python second-brain/tools/ai_os.py save <project> --agent claude-desktop --summary "<what was implemented & verified>" --next "<next immediate objective>"
    ```
-   *(This updates `project_state.md`, creates the session log in `logs/`, and executes `git commit` & `git push origin main`)*
+   *(This updates `project_state.md`, creates the session log in `logs/` marked `tier: 3`, and executes `git commit` & `git push origin main`)*
 3. Inform the user in the desktop chat that the work is finished and saved to Second Brain.
-
-
----
-
-## 5. Coding & Environment Guidelines
-- Local workspace root: `D:\YandexDisk\Atlas`
-- Second Brain root: `D:\YandexDisk\Atlas\second-brain`
-- Obsidian Vault: points to `second-brain/`
-- Local sync watcher: `second-brain/tools/start-sync.bat` (runs `sync-watch.ps1` every 30s)
-- Remote n8n webhooks:
-  - Context Resume: `https://n8n.neiroclone.ru/webhook/atlas-context-resume`
-  - Reverse Save: `https://n8n.neiroclone.ru/webhook/atlas-reverse-save`
-  - Health: `https://n8n.neiroclone.ru/webhook/atlas-health`
-- All changes must be tested and verified before marking tasks complete.

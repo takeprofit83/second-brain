@@ -14,12 +14,34 @@ All AI agents (Claude Code, Antigravity, Cursor, Windsurf, Aider, Codex, ChatGPT
 - `second-brain/Projects/Other/` — Experimental sandbox
 
 Each project is governed by:
-- `project_state.md`: Single Source of Truth for current status and `next_steps`.
-- `logs/`: Timestamped execution history.
+- `project_state.md`: Single Source of Truth for current status and `next_steps` (Tier 1 Memory).
+- `logs/`: Timestamped execution history (Tier 3 Archive).
 
 ---
 
-## 2. Universal Protocol for All Agents (Zero Terminal for User)
+## 2. TOKEN ECONOMY & TIERED MEMORY RULE
+
+> [!CAUTION]
+> **STRICT BAN ON BULK LOG READING.**
+> Agents must NEVER scan or read all historical session logs in `logs/` or `Courses/*-raw.md`.
+
+We use the Obsidian 3-Tier Memory Model:
+- **Tier 1 (Core Memory / MOC — Always Read):**
+  - Properties: `type: memory`, `tier: 1`, `ai_read: true`, `tags: [memory, moc, core]`
+  - Target: `Projects/<project>/project_state.md` (< 150 lines / ~1,200 tokens).
+  - Contains distilled state, blockers, and next steps.
+- **Tier 2 (Reference Knowledge — On Demand):**
+  - Properties: `type: knowledge`, `tier: 2`, `ai_read: on_demand`
+  - Target: `Knowledge/*.md`, `docs/DECISIONS.md`.
+  - Read ONLY if linked via `[[wikilink]]` and required for the task.
+- **Tier 3 (Logs Archive — Never Read in Bulk):**
+  - Properties: `type: log`, `tier: 3`, `ai_read: false`, `tags: [log, archive]`
+  - Target: `Projects/<project>/logs/*.md`.
+  - Append-only archive. Never inject into prompt.
+
+---
+
+## 3. Universal Protocol for All Agents (Zero Terminal for User)
 
 > [!IMPORTANT]
 > The user works 100% inside Windows Desktop Applications (Antigravity IDE & Claude Desktop). The user NEVER touches a terminal or CLI.

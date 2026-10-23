@@ -1,4 +1,11 @@
 ---
+type: memory
+tier: 1
+ai_read: true
+tags:
+  - memory
+  - moc
+  - core
 project_id: "{{project_id}}"
 title: "{{title}}"
 target_goal: "{{target_goal}}"

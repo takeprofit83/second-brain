@@ -1,4 +1,11 @@
 ---
+type: memory
+tier: 1
+ai_read: true
+tags:
+  - memory
+  - moc
+  - core
 project_id: "nastya"
 title: "Проект Настя"
 target_goal: "Персональный проект и рабочее пространство взаимодействия Насти."

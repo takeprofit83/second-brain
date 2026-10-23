@@ -185,6 +185,11 @@ def cmd_resume(args):
     print("3. Execute code edits, scripts, or tests as required.")
     print(f"4. When finished, record your session using:")
     print(f'   python second-brain/tools/ai_os.py save {project_key} --agent "<your_name>" --summary "<what was done>" --next "<next step>"')
+    print("-" * 80)
+    print("TOKEN ECONOMY DIRECTIVE (TIERED MEMORY):")
+    print("• You have received the distilled Tier 1 Memory (type: memory, tier: 1).")
+    print("• DO NOT read through historical logs in logs/ (tier: 3, ai_read: false) to conserve tokens.")
+    print("• Rely exclusively on this project state and any specific linked concepts.")
     print("=" * 80)
 
 
@@ -210,12 +215,18 @@ def cmd_save(args):
     ts_iso = now.isoformat()
     agent = args.agent or "agent"
     
-    # 1. Create Log File
+    # 1. Create Log File (Tier 3: Archive / Append-only)
     slug_agent = re.sub(r"[^a-zA-Z0-9_\-]", "", agent.lower().replace(" ", "-"))
     log_filename = f"{ts_file}-{slug_agent}.md"
     log_path = logs_dir / log_filename
     
     log_content = f"""---
+type: log
+tier: 3
+ai_read: false
+tags:
+  - log
+  - archive
 timestamp: "{ts_iso}"
 project: "{project_key}"
 agent: "{agent}"
@@ -236,11 +247,18 @@ status: "completed"
     log_path.write_text(log_content, encoding="utf-8")
     print(f"[AI-OS] Created session log: {log_path.relative_to(REPO_ROOT)}")
 
-    # 2. Update project_state.md
+    # 2. Update project_state.md (Tier 1: Core Shared Memory / MOC)
     existing_content = state_file.read_text(encoding="utf-8") if state_file.exists() else ""
     
     # Update frontmatter or create new
     new_state = f"""---
+type: memory
+tier: 1
+ai_read: true
+tags:
+  - memory
+  - moc
+  - core
 project: "{project_key}"
 status: "active"
 updated_at: "{ts_iso}"

@@ -1,4 +1,11 @@
 ---
+type: memory
+tier: 1
+ai_read: true
+tags:
+  - memory
+  - moc
+  - core
 project_id: "dzen"
 title: "Яндекс Дзен"
 target_goal: "Управление контент-планом, статьями, аналитикой и публикациями канала Яндекс Дзен."

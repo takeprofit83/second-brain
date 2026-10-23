@@ -210,9 +210,9 @@ def cmd_save(args):
         else:
             logs_dir.mkdir(parents=True, exist_ok=True)
 
-    now = datetime.datetime.now()
+    now = datetime.datetime.now(datetime.timezone.utc)
     ts_file = now.strftime("%Y%m%d-%H%M%S")
-    ts_iso = now.isoformat()
+    ts_iso = now.isoformat().replace("+00:00", "Z")
     agent = args.agent or "agent"
     
     # 1. Create Log File (Tier 3: Archive / Append-only)

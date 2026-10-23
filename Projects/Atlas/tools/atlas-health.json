@@ -1,0 +1,125 @@
+{
+  "name": "Atlas - Health Check",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "atlas-health",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "node-webhook-health",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        200,
+        300
+      ],
+      "webhookId": "c1a90101-7001-4001-8001-000000000005",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "TtnD8wFLtpPtsP2Q",
+          "name": "atlas capture secret"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://api.github.com/repos/takeprofit83/second-brain",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "githubApi",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "node-github-check",
+      "name": "Check GitHub Second Brain",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        420,
+        300
+      ],
+      "credentials": {
+        "githubApi": {
+          "id": "weiRggkEa4tOfXAN",
+          "name": "atlas github token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst ghResp = $json;\nconst isConnected = ghResp.statusCode === 200;\nconst body = ghResp.body || {};\n\nreturn [{\n  json: {\n    status: isConnected ? \"healthy\" : \"degraded\",\n    system: \"Atlas AI-OS v1.0\",\n    timestamp: new Date().toISOString(),\n    github_storage: {\n      status: isConnected ? \"connected\" : \"error\",\n      repo: \"takeprofit83/second-brain\",\n      default_branch: body.default_branch || \"main\",\n      last_push: body.pushed_at || null,\n      size_kb: body.size || 0\n    },\n    active_services: {\n      context_resume: \"active (webhook/atlas-context-resume)\",\n      reverse_save: \"active (webhook/atlas-reverse-save)\",\n      wiki_query: \"active (webhook/atlas-wiki-query)\",\n      wiki_ingest: \"active (webhook/atlas-wiki-ingest)\",\n      wiki_lint: \"active (cron: 0 4 * * *)\",\n      model_relay: \"active (debate engine)\",\n      kie_adapter: \"active (webhook/atlas-capture)\"\n    },\n    supported_projects: [\"atlas\", \"courses\", \"dzen\", \"nastya\", \"dacha\", \"other\"],\n    supported_ai_platforms: [\"chatgpt\", \"claude\", \"deepseek\", \"gemini\", \"qwen\", \"kimi\"]\n  }\n}];\n"
+      },
+      "id": "node-format-health",
+      "name": "Format Diagnostics",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        640,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "node-respond-health",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        860,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "Check GitHub Second Brain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check GitHub Second Brain": {
+      "main": [
+        [
+          {
+            "node": "Format Diagnostics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Diagnostics": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

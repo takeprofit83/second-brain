@@ -70,3 +70,10 @@
   - `Atlas - Wiki Ingest` (`WkIgV06jBAoB1S9r`), вебхук `https://n8n.neiroclone.ru/webhook/atlas-wiki-ingest`.
 - Проведён проверочный тест: отправлен контрольный вопрос к `atlas-wiki-query`, получен корректный статус 200 OK с проверкой по `Knowledge/index.md`.
 - Статус Фазы D: **COMPLETED (PASS)**.
+
+#### Фаза K: Автоматизация рабочих процессов (Wiki Lint & Health Check)
+- Привязаны боевые credentials к воркфлоу `Atlas - Wiki Lint` (`WkLtV06jBAoB1S9r`), настроено ежедневное расписание (cron: `0 4 * * *`) для автоматической сверки страниц `Knowledge/` со сводным индексом `Knowledge/index.md`.
+- Разработан и развёрнут в n8n боевой диагностический воркфлоу самопроверки `Atlas - Health Check` (`HlThV06jBAoB1S9r`), вебхук `https://n8n.neiroclone.ru/webhook/atlas-health` (GET) с авторизацией по `X-Atlas-Secret`.
+- Проведён проверочный запрос к `atlas-health`: возвращён статус 200 OK со сводкой здоровья всех сервисов, подключением к GitHub и статусом репозитория `takeprofit83/second-brain`.
+- Изменения зафиксированы в GitHub (коммит `46a94e4`).
+- Статус Фазы K: **COMPLETED (PASS)**.

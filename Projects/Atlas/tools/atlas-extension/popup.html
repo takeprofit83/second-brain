@@ -3,166 +3,489 @@
 <head>
 <meta charset="utf-8">
 <style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body {
-    width: 380px;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    background: #0d1117;
-    color: #e6edf3;
-    padding: 16px;
-    font-size: 13px;
+  :root {
+    --bg-base: #060911;
+    --bg-surface: rgba(17, 24, 39, 0.7);
+    --bg-card: rgba(22, 31, 52, 0.6);
+    --border-subtle: rgba(255, 255, 255, 0.08);
+    --border-glow: rgba(99, 102, 241, 0.4);
+    --text-primary: #f8fafc;
+    --text-secondary: #94a3b8;
+    --text-muted: #64748b;
   }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    width: 460px;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif;
+    background: radial-gradient(120% 120% at 50% 0%, #1e1b4b 0%, #0b0f19 50%, #030712 100%);
+    color: var(--text-primary);
+    padding: 20px;
+    font-size: 13px;
+    letter-spacing: -0.01em;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+    min-height: 520px;
+  }
+
+  /* Custom Slim Glow Scrollbar */
+  ::-webkit-scrollbar { width: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(99, 102, 241, 0.3); border-radius: 4px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(99, 102, 241, 0.5); }
+
+  /* ==================== HEADER (MISSION CONTROL) ==================== */
   .header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 14px;
-    padding-bottom: 10px;
-    border-bottom: 1px solid #30363d;
+    margin-bottom: 18px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--border-subtle);
   }
-  .logo-title {
+
+  .logo-block {
     display: flex;
     align-items: center;
-    gap: 8px;
-    font-size: 15px;
-    font-weight: 600;
-    color: #58a6ff;
+    gap: 12px;
   }
-  .logo-dot {
-    width: 10px;
-    height: 10px;
+
+  .orb-wrapper {
+    position: relative;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .orb-glow {
+    position: absolute;
+    width: 100%;
+    height: 100%;
     border-radius: 50%;
-    background: #2a6df4;
-    box-shadow: 0 0 8px #2a6df4;
-  }
-  .nav-tabs {
-    display: flex;
-    gap: 4px;
-    background: #161b22;
-    padding: 4px;
-    border-radius: 8px;
-    margin-bottom: 14px;
-    border: 1px solid #30363d;
-  }
-  .nav-tab {
-    flex: 1;
-    text-align: center;
-    padding: 7px 6px;
-    border-radius: 6px;
-    cursor: pointer;
-    font-weight: 500;
-    font-size: 12px;
-    color: #8b949e;
-    transition: all 0.15s;
-  }
-  .nav-tab.active {
-    background: #21262d;
-    color: #f0f6fc;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.3);
-  }
-  .section { display: none; }
-  .section.active { display: block; }
-
-  .status-box {
-    background: #161b22;
-    border: 1px solid #30363d;
-    border-radius: 8px;
-    padding: 12px;
-    margin-bottom: 14px;
-    line-height: 1.4;
-    font-size: 13px;
-    color: #c9d1d9;
-  }
-  .btn-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 8px;
-    margin-bottom: 14px;
-  }
-  .proj-btn {
-    padding: 9px 4px;
-    border-radius: 6px;
-    border: none;
-    font-weight: 600;
-    font-size: 12px;
-    color: #fff;
-    cursor: pointer;
-    text-align: center;
-    transition: transform 0.1s, filter 0.15s;
-  }
-  .proj-btn:hover { filter: brightness(1.15); transform: translateY(-1px); }
-  .proj-btn:active { transform: translateY(1px); }
-  .proj-btn.selected {
-    box-shadow: 0 0 0 2px #fff, 0 0 8px rgba(255,255,255,0.4);
-    filter: brightness(1.2);
+    background: linear-gradient(135deg, #6366f1 0%, #ec4899 100%);
+    filter: blur(8px);
+    opacity: 0.6;
+    animation: orbPulse 3s ease-in-out infinite;
   }
 
-  .btn-primary {
-    width: 100%;
-    padding: 11px;
-    border-radius: 6px;
-    border: none;
-    font-size: 13px;
-    font-weight: 600;
-    cursor: pointer;
-    background: #238636;
-    color: #fff;
+  .orb-core {
+    position: relative;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #818cf8 0%, #c084fc 100%);
+    box-shadow: inset 0 2px 4px rgba(255, 255, 255, 0.4), 0 0 10px rgba(129, 140, 248, 0.8);
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 8px;
-    margin-bottom: 8px;
-    transition: all 0.15s;
-  }
-  .btn-primary:hover { background: #2ea043; }
-  .btn-secondary {
-    width: 100%;
-    padding: 10px;
-    border-radius: 6px;
-    border: 1px solid #30363d;
-    background: #21262d;
-    color: #c9d1d9;
-    font-size: 13px;
-    font-weight: 500;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    margin-bottom: 8px;
-  }
-  .btn-secondary:hover { background: #30363d; color: #fff; }
-
-  .meta-card {
-    background: #0d1117;
-    border: 1px solid #21262d;
-    border-radius: 6px;
-    padding: 10px;
-    margin-bottom: 12px;
-    font-size: 12px;
-  }
-  .meta-title { font-weight: 600; color: #58a6ff; margin-bottom: 4px; }
-  .meta-detail { color: #8b949e; margin-bottom: 2px; }
-
-  .quick-links {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    margin-top: 10px;
-    padding-top: 10px;
-    border-top: 1px solid #21262d;
-    justify-content: center;
-  }
-  .quick-link {
     font-size: 11px;
-    color: #8b949e;
-    text-decoration: none;
-    background: #161b22;
-    padding: 4px 8px;
-    border-radius: 4px;
-    border: 1px solid #21262d;
+    font-weight: 800;
+    color: #fff;
   }
-  .quick-link:hover { color: #58a6ff; border-color: #30363d; }
+
+  @keyframes orbPulse {
+    0%, 100% { transform: scale(0.95); opacity: 0.5; }
+    50% { transform: scale(1.15); opacity: 0.85; }
+  }
+
+  .logo-titles {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .brand-title {
+    font-size: 16px;
+    font-weight: 800;
+    background: linear-gradient(135deg, #ffffff 0%, #cbd5e1 50%, #818cf8 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    letter-spacing: -0.02em;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .version-tag {
+    font-size: 10px;
+    padding: 1px 6px;
+    border-radius: 6px;
+    background: rgba(99, 102, 241, 0.2);
+    border: 1px solid rgba(99, 102, 241, 0.4);
+    color: #a5b4fc;
+    font-weight: 700;
+  }
+
+  .brand-sub {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-weight: 500;
+  }
+
+  /* Live Radar Site Badge */
+  .radar-pill {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(15, 23, 42, 0.8);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 6px 12px;
+    border-radius: 20px;
+    backdrop-filter: blur(8px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  }
+
+  .radar-indicator {
+    position: relative;
+    width: 8px;
+    height: 8px;
+  }
+
+  .radar-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #10b981;
+    box-shadow: 0 0 8px #10b981;
+  }
+
+  .radar-wave {
+    position: absolute;
+    top: 0; left: 0;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #10b981;
+    opacity: 0.75;
+    animation: radarPing 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+  }
+
+  @keyframes radarPing {
+    0% { transform: scale(1); opacity: 0.8; }
+    100% { transform: scale(2.8); opacity: 0; }
+  }
+
+  .radar-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: #e2e8f0;
+  }
+
+  /* ==================== FLOATING DOCK TABS ==================== */
+  .dock-tabs {
+    display: flex;
+    background: rgba(15, 23, 42, 0.85);
+    padding: 4px;
+    border-radius: 14px;
+    margin-bottom: 20px;
+    border: 1px solid var(--border-subtle);
+    backdrop-filter: blur(12px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  }
+
+  .dock-tab {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 10px 8px;
+    border-radius: 10px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 12px;
+    color: var(--text-secondary);
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    user-select: none;
+  }
+
+  .dock-tab:hover {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.04);
+  }
+
+  .dock-tab.active {
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.3) 0%, rgba(168, 85, 247, 0.3) 100%);
+    color: #fff;
+    border: 1px solid rgba(168, 85, 247, 0.4);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  }
+
+  .section { display: none; }
+  .section.active { display: block; animation: slideFade 0.25s ease-out; }
+
+  @keyframes slideFade {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ==================== BENTO GRID PROJECT CARDS ==================== */
+  .section-headline {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .bento-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    margin-bottom: 18px;
+  }
+
+  .bento-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: 14px;
+    padding: 12px 14px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+    backdrop-filter: blur(8px);
+    text-align: left;
+  }
+
+  .bento-card::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 14px;
+    border: 1px solid transparent;
+    transition: 0.22s;
+    pointer-events: none;
+  }
+
+  .bento-card:hover {
+    transform: translateY(-2px);
+    background: rgba(30, 41, 69, 0.7);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  }
+
+  .bento-card.selected {
+    background: linear-gradient(145deg, rgba(30, 41, 69, 0.9) 0%, rgba(22, 31, 52, 0.95) 100%);
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.5), 0 0 0 1px #fff;
+    transform: scale(1.02);
+  }
+
+  .bento-card.selected::after {
+    border-color: rgba(255, 255, 255, 0.8);
+  }
+
+  .bento-icon-box {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+    box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.2);
+  }
+
+  .bento-info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .bento-title {
+    font-weight: 700;
+    font-size: 13px;
+    color: #fff;
+    margin-bottom: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .bento-desc {
+    font-size: 11px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* Distinct Accent Themes */
+  .card-atlas .bento-icon-box   { background: linear-gradient(135deg, rgba(37, 99, 235, 0.3) 0%, rgba(59, 130, 246, 0.2) 100%); border: 1px solid rgba(59, 130, 246, 0.4); }
+  .card-dzen .bento-icon-box    { background: linear-gradient(135deg, rgba(234, 88, 12, 0.3) 0%, rgba(249, 115, 22, 0.2) 100%); border: 1px solid rgba(249, 115, 22, 0.4); }
+  .card-courses .bento-icon-box { background: linear-gradient(135deg, rgba(16, 185, 129, 0.3) 0%, rgba(52, 211, 153, 0.2) 100%); border: 1px solid rgba(16, 185, 129, 0.4); }
+  .card-dacha .bento-icon-box   { background: linear-gradient(135deg, rgba(217, 119, 6, 0.3) 0%, rgba(245, 158, 11, 0.2) 100%); border: 1px solid rgba(245, 158, 11, 0.4); }
+  .card-nastya .bento-icon-box  { background: linear-gradient(135deg, rgba(219, 39, 119, 0.3) 0%, rgba(236, 72, 153, 0.2) 100%); border: 1px solid rgba(236, 72, 153, 0.4); }
+  .card-other .bento-icon-box   { background: linear-gradient(135deg, rgba(124, 58, 237, 0.3) 0%, rgba(168, 85, 247, 0.2) 100%); border: 1px solid rgba(168, 85, 247, 0.4); }
+
+  /* ==================== HERO ACTION ZONE ==================== */
+  .hero-panel {
+    background: linear-gradient(145deg, rgba(20, 27, 45, 0.8) 0%, rgba(11, 16, 28, 0.9) 100%);
+    border: 1px solid var(--border-glow);
+    border-radius: 16px;
+    padding: 16px;
+    margin-bottom: 18px;
+    backdrop-filter: blur(14px);
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  }
+
+  .status-message {
+    font-size: 12.5px;
+    line-height: 1.5;
+    color: #cbd5e1;
+    margin-bottom: 12px;
+  }
+
+  .meta-preview {
+    background: rgba(8, 12, 20, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    padding: 10px 12px;
+    margin-bottom: 14px;
+    font-size: 11.5px;
+    line-height: 1.5;
+  }
+
+  .meta-heading {
+    font-weight: 700;
+    color: #818cf8;
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  /* HIGH IMPACT ACTION BUTTONS */
+  .cta-button {
+    width: 100%;
+    padding: 13px 18px;
+    border-radius: 12px;
+    border: none;
+    font-size: 13.5px;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin-bottom: 10px;
+    transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .cta-inject {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: #ffffff;
+    box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  }
+  .cta-inject:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 28px rgba(16, 185, 129, 0.55);
+    filter: brightness(1.1);
+  }
+
+  .cta-copy {
+    background: rgba(30, 41, 59, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: #e2e8f0;
+  }
+  .cta-copy:hover {
+    background: rgba(51, 65, 85, 0.85);
+    border-color: rgba(255, 255, 255, 0.25);
+    transform: translateY(-1px);
+  }
+
+  .cta-autofill {
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #d946ef 100%);
+    color: #ffffff;
+    font-size: 12.5px;
+    padding: 11px 16px;
+    box-shadow: 0 6px 20px rgba(99, 102, 241, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  }
+  .cta-autofill:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 28px rgba(168, 85, 247, 0.55);
+    filter: brightness(1.12);
+  }
+
+  .cta-save {
+    background: linear-gradient(135deg, #2563eb 0%, #4f46e5 100%);
+    color: #ffffff;
+    box-shadow: 0 6px 20px rgba(37, 99, 235, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  }
+  .cta-save:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 28px rgba(37, 99, 235, 0.6);
+    filter: brightness(1.12);
+  }
+
+  .cta-button:active {
+    transform: translateY(1px);
+  }
+
+  /* ==================== FORM INPUTS (REPORT) ==================== */
+  .form-box {
+    margin-bottom: 12px;
+  }
+  .field-label {
+    display: block;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-secondary);
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .field-input, .field-textarea {
+    width: 100%;
+    background: rgba(15, 23, 42, 0.75);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    color: var(--text-primary);
+    padding: 10px 12px;
+    font-size: 12px;
+    font-family: inherit;
+    outline: none;
+    transition: all 0.2s;
+  }
+  .field-input:focus, .field-textarea:focus {
+    border-color: #818cf8;
+    box-shadow: 0 0 0 3px rgba(129, 140, 248, 0.25);
+    background: rgba(15, 23, 42, 0.95);
+  }
+  .field-textarea {
+    resize: vertical;
+    min-height: 64px;
+    line-height: 1.45;
+  }
+
+  details {
+    background: rgba(15, 23, 42, 0.5);
+    border: 1px solid var(--border-subtle);
+    border-radius: 10px;
+    padding: 10px 12px;
+    margin-bottom: 14px;
+  }
+  details summary {
+    cursor: pointer;
+    font-size: 11.5px;
+    font-weight: 600;
+    color: #818cf8;
+    user-select: none;
+    outline: none;
+  }
+
+  /* SPINNER */
   .spinner {
     display: inline-block;
     width: 14px;
@@ -174,167 +497,256 @@
     vertical-align: middle;
   }
   @keyframes spin { to { transform: rotate(360deg); } }
-  .badge {
-    display: inline-block;
-    padding: 2px 6px;
-    border-radius: 10px;
+
+  /* ==================== FOOTER ==================== */
+  .footer-status {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-top: 12px;
+    margin-top: 18px;
+    border-top: 1px solid var(--border-subtle);
     font-size: 11px;
-    font-weight: 600;
-    background: #1f6feb;
-    color: #fff;
+    color: var(--text-muted);
   }
 
-  /* Form controls for Report section */
-  .form-group {
-    margin-bottom: 10px;
-  }
-  .form-label {
-    display: block;
-    font-size: 11px;
+  .status-badge-ok {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: #34d399;
     font-weight: 600;
-    color: #8b949e;
-    margin-bottom: 4px;
-  }
-  .form-input, .form-textarea {
-    width: 100%;
-    background: #161b22;
-    border: 1px solid #30363d;
-    border-radius: 6px;
-    color: #e6edf3;
-    padding: 7px 9px;
-    font-size: 12px;
-    font-family: inherit;
-    outline: none;
-    transition: border-color 0.15s;
-  }
-  .form-input:focus, .form-textarea:focus {
-    border-color: #58a6ff;
-  }
-  .form-textarea {
-    resize: vertical;
-    min-height: 52px;
-  }
-  details summary {
-    cursor: pointer;
-    font-size: 11px;
-    color: #58a6ff;
-    margin-bottom: 8px;
-    user-select: none;
   }
 </style>
 </head>
 <body>
 
+<!-- MISSION CONTROL HEADER -->
 <div class="header">
-  <div class="logo-title">
-    <div class="logo-dot"></div>
-    <span>Atlas AI-OS</span>
+  <div class="logo-block">
+    <div class="orb-wrapper">
+      <div class="orb-glow"></div>
+      <div class="orb-core">AI</div>
+    </div>
+    <div class="logo-titles">
+      <div class="brand-title">
+        <span>Atlas AI-OS</span>
+        <span class="version-tag">PRO</span>
+      </div>
+      <div class="brand-sub">Universal Second Brain Engine</div>
+    </div>
   </div>
-  <span id="platform-badge" class="badge">Авто</span>
+
+  <div class="radar-pill" id="platform-badge">
+    <div class="radar-indicator">
+      <div class="radar-wave"></div>
+      <div class="radar-dot"></div>
+    </div>
+    <span class="radar-label">Автодетект</span>
+  </div>
 </div>
 
-<div class="nav-tabs">
-  <div class="nav-tab active" id="tab-resume-btn">📥 Подхватить</div>
-  <div class="nav-tab" id="tab-capture-btn">📤 Захватить</div>
-  <div class="nav-tab" id="tab-report-btn">📝 Отчёт</div>
+<!-- FLOATING DOCK TABS -->
+<div class="dock-tabs">
+  <div class="dock-tab active" id="tab-resume-btn">📥 Подхватить</div>
+  <div class="dock-tab" id="tab-capture-btn">📤 Захватить</div>
+  <div class="dock-tab" id="tab-report-btn">📝 Отчёт</div>
 </div>
 
-<!-- СЕКЦИЯ 1: ПОДХВАТ КОНТЕКСТА (RESUME) -->
+<!-- ==================== СЕКЦИЯ 1: ПОДХВАТИТЬ (RESUME) ==================== -->
 <div class="section active" id="sec-resume">
-  <div class="status-box" id="resume-status">
-    Выберите проект для загрузки последнего handoff:
+  <div class="section-headline">
+    <span>Выберите проект (Bento Grid)</span>
+    <span style="color:#818cf8; font-weight:600;">6 Проектов</span>
   </div>
 
-  <div class="btn-grid" id="resume-buttons">
-    <button class="proj-btn" style="background:#2a6df4" data-key="atlas">Atlas</button>
-    <button class="proj-btn" style="background:#2fa84f" data-key="courses">Курс</button>
-    <button class="proj-btn" style="background:#e6492d" data-key="dzen">Дзен</button>
-    <button class="proj-btn" style="background:#e0468c" data-key="nastya">Настя</button>
-    <button class="proj-btn" style="background:#d98c1f" data-key="dacha">Дача</button>
-    <button class="proj-btn" style="background:#8957e5" data-key="other">Другое</button>
+  <div class="bento-grid" id="resume-buttons">
+    <button class="bento-card card-atlas proj-btn" data-key="atlas">
+      <div class="bento-icon-box">🌌</div>
+      <div class="bento-info">
+        <div class="bento-title">Atlas Core</div>
+        <div class="bento-desc">Оркестрация & AI-OS</div>
+      </div>
+    </button>
+
+    <button class="bento-card card-dzen proj-btn" data-key="dzen">
+      <div class="bento-icon-box">✍️</div>
+      <div class="bento-info">
+        <div class="bento-title">Яндекс Дзен</div>
+        <div class="bento-desc">Контент-фабрика</div>
+      </div>
+    </button>
+
+    <button class="bento-card card-courses proj-btn" data-key="courses">
+      <div class="bento-icon-box">🎓</div>
+      <div class="bento-info">
+        <div class="bento-title">Обучение</div>
+        <div class="bento-desc">Конспекты и курсы</div>
+      </div>
+    </button>
+
+    <button class="bento-card card-dacha proj-btn" data-key="dacha">
+      <div class="bento-icon-box">🏡</div>
+      <div class="bento-info">
+        <div class="bento-title">Умная Дача</div>
+        <div class="bento-desc">Боты ВК/ТГ и дом</div>
+      </div>
+    </button>
+
+    <button class="bento-card card-nastya proj-btn" data-key="nastya">
+      <div class="bento-icon-box">🌸</div>
+      <div class="bento-info">
+        <div class="bento-title">Настя</div>
+        <div class="bento-desc">Персональный хаб</div>
+      </div>
+    </button>
+
+    <button class="bento-card card-other proj-btn" data-key="other">
+      <div class="bento-icon-box">🔮</div>
+      <div class="bento-info">
+        <div class="bento-title">Песочница</div>
+        <div class="bento-desc">Эксперименты и R&D</div>
+      </div>
+    </button>
   </div>
 
-  <div id="resume-actions" style="display:none;">
-    <div class="meta-card" id="resume-meta"></div>
-    <button class="btn-primary" id="btn-copy-context">📋 Скопировать в буфер</button>
-    <button class="btn-secondary" id="btn-inject-context">⚡ Вставить прямо в чат</button>
-  </div>
+  <!-- HERO ACTION ZONE -->
+  <div class="hero-panel">
+    <div class="status-message" id="resume-status">
+      Выберите проект выше для загрузки контекста из Second Brain.
+    </div>
 
-  <div class="quick-links">
-    <a href="https://claude.ai/new" target="_blank" class="quick-link">Claude</a>
-    <a href="https://chatgpt.com" target="_blank" class="quick-link">ChatGPT</a>
-    <a href="https://chat.deepseek.com" target="_blank" class="quick-link">DeepSeek</a>
-    <a href="https://gemini.google.com/app" target="_blank" class="quick-link">Gemini</a>
-    <a href="https://kimi.moonshot.cn" target="_blank" class="quick-link">Kimi</a>
+    <div id="resume-actions" style="display:none;">
+      <div class="meta-preview" id="resume-meta"></div>
+      <button class="cta-button cta-inject" id="btn-inject-context">
+        ⚡ Вставить прямо в чат
+      </button>
+      <button class="cta-button cta-copy" id="btn-copy-context">
+        📋 Скопировать промпт в буфер
+      </button>
+    </div>
   </div>
 </div>
 
-<!-- СЕКЦИЯ 2: ЗАХВАТ ДИАЛОГА (CAPTURE) -->
+<!-- ==================== СЕКЦИЯ 2: ЗАХВАТИТЬ (CAPTURE) ==================== -->
 <div class="section" id="sec-capture">
-  <div class="status-box" id="capture-status">
-    Определение активного чата…
-  </div>
+  <div class="hero-panel">
+    <div class="status-message" id="capture-status">
+      Определяю активный диалог с ИИ…
+    </div>
 
-  <button class="btn-primary" id="btn-read-chat" style="display:none;">
-    🔍 Прочитать диалог со страницы
-  </button>
+    <button class="cta-button cta-save" id="btn-read-chat" style="display:none;">
+      🔍 Прочитать диалог со страницы
+    </button>
+  </div>
 
   <div id="capture-picker" style="display:none;">
-    <div style="font-size:12px; color:#8b949e; margin-bottom:8px;">Куда сохранить конспект?</div>
-    <div class="btn-grid" id="capture-buttons">
-      <button class="proj-btn" style="background:#2a6df4" data-key="atlas">Atlas</button>
-      <button class="proj-btn" style="background:#2fa84f" data-key="courses">Курс</button>
-      <button class="proj-btn" style="background:#e6492d" data-key="dzen">Дзен</button>
-      <button class="proj-btn" style="background:#e0468c" data-key="nastya">Настя</button>
-      <button class="proj-btn" style="background:#d98c1f" data-key="dacha">Дача</button>
-      <button class="proj-btn" style="background:#8957e5" data-key="other">Другое</button>
+    <div class="section-headline">В какой проект упаковать сессию?</div>
+    <div class="bento-grid" id="capture-buttons">
+      <button class="bento-card card-atlas proj-btn" data-key="atlas">
+        <div class="bento-icon-box">🌌</div>
+        <div class="bento-info"><div class="bento-title">Atlas Core</div></div>
+      </button>
+      <button class="bento-card card-dzen proj-btn" data-key="dzen">
+        <div class="bento-icon-box">✍️</div>
+        <div class="bento-info"><div class="bento-title">Дзен</div></div>
+      </button>
+      <button class="bento-card card-courses proj-btn" data-key="courses">
+        <div class="bento-icon-box">🎓</div>
+        <div class="bento-info"><div class="bento-title">Курсы</div></div>
+      </button>
+      <button class="bento-card card-dacha proj-btn" data-key="dacha">
+        <div class="bento-icon-box">🏡</div>
+        <div class="bento-info"><div class="bento-title">Дача</div></div>
+      </button>
+      <button class="bento-card card-nastya proj-btn" data-key="nastya">
+        <div class="bento-icon-box">🌸</div>
+        <div class="bento-info"><div class="bento-title">Настя</div></div>
+      </button>
+      <button class="bento-card card-other proj-btn" data-key="other">
+        <div class="bento-icon-box">🔮</div>
+        <div class="bento-info"><div class="bento-title">Другое</div></div>
+      </button>
     </div>
   </div>
 </div>
 
-<!-- СЕКЦИЯ 3: ОБРАТНАЯ ЗАПИСЬ ОТЧЁТА (REPORT & SAVE) -->
+<!-- ==================== СЕКЦИЯ 3: ОТЧЁТ (REPORT & SAVE) ==================== -->
 <div class="section" id="sec-report">
-  <div style="font-size:12px; color:#8b949e; margin-bottom:8px;">1. Выберите проект:</div>
-  <div class="btn-grid" id="report-project-buttons">
-    <button class="proj-btn selected" style="background:#2a6df4" data-key="atlas">Atlas</button>
-    <button class="proj-btn" style="background:#2fa84f" data-key="courses">Курс</button>
-    <button class="proj-btn" style="background:#e6492d" data-key="dzen">Дзен</button>
-    <button class="proj-btn" style="background:#e0468c" data-key="nastya">Настя</button>
-    <button class="proj-btn" style="background:#d98c1f" data-key="dacha">Дача</button>
-    <button class="proj-btn" style="background:#8957e5" data-key="other">Другое</button>
+  <div class="section-headline">1. Выберите проект</div>
+  <div class="bento-grid" id="report-project-buttons" style="margin-bottom:12px;">
+    <button class="bento-card card-atlas proj-btn selected" data-key="atlas">
+      <div class="bento-icon-box">🌌</div>
+      <div class="bento-info"><div class="bento-title">Atlas</div></div>
+    </button>
+    <button class="bento-card card-dzen proj-btn" data-key="dzen">
+      <div class="bento-icon-box">✍️</div>
+      <div class="bento-info"><div class="bento-title">Дзен</div></div>
+    </button>
+    <button class="bento-card card-courses proj-btn" data-key="courses">
+      <div class="bento-icon-box">🎓</div>
+      <div class="bento-info"><div class="bento-title">Курсы</div></div>
+    </button>
+    <button class="bento-card card-dacha proj-btn" data-key="dacha">
+      <div class="bento-icon-box">🏡</div>
+      <div class="bento-info"><div class="bento-title">Дача</div></div>
+    </button>
+    <button class="bento-card card-nastya proj-btn" data-key="nastya">
+      <div class="bento-icon-box">🌸</div>
+      <div class="bento-info"><div class="bento-title">Настя</div></div>
+    </button>
+    <button class="bento-card card-other proj-btn" data-key="other">
+      <div class="bento-icon-box">🔮</div>
+      <div class="bento-info"><div class="bento-title">Другое</div></div>
+    </button>
   </div>
 
-  <div class="form-group">
-    <label class="form-label">2. Что сделано (резюме сессии):</label>
-    <textarea class="form-textarea" id="report-summary" placeholder="Краткое описание выполненных задач..."></textarea>
-  </div>
-
-  <div class="form-group">
-    <label class="form-label">3. Следующий шаг (next step):</label>
-    <input class="form-input" id="report-next-step" type="text" placeholder="Конкретный шаг для следующего ИИ...">
-  </div>
-
-  <details>
-    <summary>Дополнительные поля и вставка JSON</summary>
-    <div class="form-group" style="margin-top:6px;">
-      <label class="form-label">Выполненные действия (по строкам):</label>
-      <textarea class="form-textarea" id="report-actions" rows="2" placeholder="Действие 1&#10;Действие 2"></textarea>
-    </div>
-    <div class="form-group">
-      <label class="form-label">Принятые решения:</label>
-      <input class="form-input" id="report-decisions" type="text" placeholder="Решение или ADR...">
-    </div>
-    <div class="form-group">
-      <label class="form-label">Или вставьте полный JSON-отчёт ИИ:</label>
-      <textarea class="form-textarea" id="report-raw-json" rows="3" placeholder='{"project_id":"atlas","summary":"...","next_step":"..."}'></textarea>
-    </div>
-  </details>
-
-  <button class="btn-primary" id="btn-submit-report" style="margin-top:8px;">
-    🚀 Сохранить отчёт в Second Brain
+  <button class="cta-button cta-autofill" id="btn-autofill-report">
+    ✨ Сформировать отчёт из чата в 1 клик
   </button>
 
-  <div id="report-status-box" class="status-box" style="display:none; margin-top:10px;"></div>
+  <div class="hero-panel" style="padding:14px; margin-bottom:14px;">
+    <div class="form-box">
+      <label class="field-label">2. Что сделано (резюме сессии)</label>
+      <textarea class="field-textarea" id="report-summary" placeholder="Краткое описание выполненных задач..."></textarea>
+    </div>
+
+    <div class="form-box">
+      <label class="field-label">3. Следующий шаг (next step)</label>
+      <input class="field-input" id="report-next-step" type="text" placeholder="Конкретный шаг для следующего ИИ...">
+    </div>
+
+    <details>
+      <summary>Дополнительные параметры и JSON</summary>
+      <div class="form-box" style="margin-top:10px;">
+        <label class="field-label">Выполненные действия (по строкам)</label>
+        <textarea class="field-textarea" id="report-actions" rows="2" placeholder="Действие 1&#10;Действие 2"></textarea>
+      </div>
+      <div class="form-box">
+        <label class="field-label">Принятые решения</label>
+        <input class="field-input" id="report-decisions" type="text" placeholder="Решение или ADR...">
+      </div>
+      <div class="form-box">
+        <label class="field-label">Или вставьте полный JSON-отчёт</label>
+        <textarea class="field-textarea" id="report-raw-json" rows="3" placeholder='{"project_id":"atlas","summary":"...","next_step":"..."}'></textarea>
+      </div>
+    </details>
+
+    <button class="cta-button cta-save" id="btn-submit-report" style="margin-bottom:0;">
+      🚀 Сохранить в Second Brain (GitHub Synced)
+    </button>
+  </div>
+
+  <div id="report-status-box" class="hero-panel" style="display:none; margin-top:10px; border-color:#10b981;"></div>
+</div>
+
+<!-- FOOTER STATUS -->
+<div class="footer-status">
+  <span>Second Brain • AI-OS v1.0</span>
+  <span class="status-badge-ok">
+    <span class="radar-dot"></span>
+    Связь с GitHub и n8n активна
+  </span>
 </div>
 
 <script src="popup.js"></script>

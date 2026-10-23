@@ -73,15 +73,13 @@
         kimi: 'Kimi'
       };
       const name = names[activePlatform] || activePlatform;
-      badgeEl.textContent = name;
-      badgeEl.style.background = '#238636';
+      badgeEl.innerHTML = `<div class="platform-dot"></div><span>${name}</span>`;
 
       captureStatus.innerHTML = `Обнаружен чат <b>${name}</b>.<br>Нажмите кнопку ниже, чтобы прочитать диалог:`;
       btnReadChat.style.display = 'flex';
       btnReadChat.textContent = `🔍 Прочитать диалог ${name}`;
     } else {
-      badgeEl.textContent = 'Обычная вкладка';
-      badgeEl.style.background = '#6e7681';
+      badgeEl.innerHTML = `<div class="platform-dot" style="background:#64748b; box-shadow:none;"></div><span>Вне чата</span>`;
       captureStatus.textContent = 'Откройте вкладку ChatGPT, Claude, DeepSeek, Gemini, Qwen или Kimi для захвата диалога.';
       btnReadChat.style.display = 'none';
     }
@@ -91,8 +89,12 @@
   document.getElementById('resume-buttons').addEventListener('click', (e) => {
     const btn = e.target.closest('button[data-key]');
     if (!btn) return;
+    document.querySelectorAll('#resume-buttons .proj-btn').forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+
     const projectKey = btn.getAttribute('data-key');
-    const label = btn.textContent.trim();
+    const titleEl = btn.querySelector('.bento-title');
+    const label = titleEl ? titleEl.textContent.trim() : btn.textContent.trim();
 
     resumeStatus.innerHTML = `<span class="spinner"></span> Запрашиваю последний контекст для <b>${label}</b>…`;
     resumeActions.style.display = 'none';
@@ -270,6 +272,81 @@
       reportStatusBox.innerHTML = '✨ JSON успешно распознан и поля заполнены!';
     } catch(e) {}
   });
+
+  // Автозаполнение отчёта из активного чата одной кнопкой
+  const btnAutofillReport = document.getElementById('btn-autofill-report');
+  if (btnAutofillReport) {
+    btnAutofillReport.addEventListener('click', () => {
+      if (!activeTab) return;
+      btnAutofillReport.innerHTML = '<span class="spinner"></span> Извлекаю из чата…';
+      btnAutofillReport.disabled = true;
+
+      chrome.scripting.executeScript({
+        target: { tabId: activeTab.id },
+        files: ['extractor.js']
+      }, (results) => {
+        btnAutofillReport.disabled = false;
+        btnAutofillReport.textContent = '⚡ Автоматически заполнить из ответа чата';
+        const payload = results && results[0] && results[0].result;
+        if (!payload || !payload.text) {
+          reportStatusBox.style.display = 'block';
+          reportStatusBox.innerHTML = '<span style="color:#f85149">⚠️ Не удалось прочитать активный чат. Убедитесь, что страница открыта.</span>';
+          return;
+        }
+
+        const text = payload.text;
+
+        // 1. Попытка найти JSON-блок ```json ... ```
+        const jsonMatch = text.match(/```json\s*([\s\S]*?)\s*```/i);
+        if (jsonMatch) {
+          try {
+            const parsed = JSON.parse(jsonMatch[1]);
+            if (parsed.summary) reportSummary.value = parsed.summary;
+            if (parsed.next_step) reportNextStep.value = parsed.next_step;
+            if (parsed.project_id) {
+              selectedReportProject = parsed.project_id.toLowerCase();
+              document.querySelectorAll('#report-project-buttons .proj-btn').forEach(b => {
+                b.classList.toggle('selected', b.getAttribute('data-key') === selectedReportProject);
+              });
+            }
+            if (Array.isArray(parsed.completed_actions)) reportActions.value = parsed.completed_actions.join('\n');
+            reportStatusBox.style.display = 'block';
+            reportStatusBox.innerHTML = '✨ JSON успешно извлечён из ответа ИИ!';
+            return;
+          } catch(e) {}
+        }
+
+        // 2. Интеллектуальное извлечение из последнего ответа Ассистента
+        const assistantParts = text.split(/Ассистент:\s*/i);
+        const lastReply = assistantParts.length > 1 ? assistantParts[assistantParts.length - 1].trim() : text;
+
+        // Поиск Резюме
+        let foundSummary = '';
+        const summaryMatch = lastReply.match(/(?:резюме|итог|что сделано|выполнено|summary)[:\s*\n]+([\s\S]*?)(?=(?:следующ|next|план|\n##|\n\*\*|\Z))/i);
+        if (summaryMatch && summaryMatch[1].trim()) {
+          foundSummary = summaryMatch[1].trim();
+        } else {
+          const paragraphs = lastReply.split(/\n\n+/).filter(p => p.trim() && !p.startsWith('#'));
+          foundSummary = paragraphs.slice(0, 2).join('\n\n').substring(0, 500);
+        }
+
+        // Поиск Следующего шага
+        let foundNext = '';
+        const nextMatch = lastReply.match(/(?:следующий шаг|next step|план действий|далее)[:\s*\n]+([^\n]+(?:\n[^\n#]+)?)/i);
+        if (nextMatch && nextMatch[1].trim()) {
+          foundNext = nextMatch[1].trim().replace(/^[-*•\d.]+\s*/, '');
+        } else {
+          foundNext = 'Продолжить выполнение задач по плану проекта.';
+        }
+
+        reportSummary.value = foundSummary || lastReply.substring(0, 400);
+        reportNextStep.value = foundNext.substring(0, 150);
+
+        reportStatusBox.style.display = 'block';
+        reportStatusBox.innerHTML = '✨ Поля отчёта автоматически заполнены из чата! Нажмите «Сохранить отчёт».';
+      });
+    });
+  }
 
   btnSubmitReport.addEventListener('click', () => {
     const summary = reportSummary.value.trim();

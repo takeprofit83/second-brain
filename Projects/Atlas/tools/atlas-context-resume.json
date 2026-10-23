@@ -1,0 +1,213 @@
+{
+  "id": "TyMCUfCLua060sdc",
+  "name": "Atlas - Context Resume",
+  "active": true,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "atlas-context-resume",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "2c7f857d-49f3-49c1-8c82-331f0aef4c88",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -208,
+        480
+      ],
+      "webhookId": "c1a90101-7001-4001-8001-000000000001",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "TtnD8wFLtpPtsP2Q",
+          "name": "atlas capture secret"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst body = $json.body || {};\nconst project = (body.project || 'atlas').toLowerCase().trim();\n\nconst mapping = {\n  'atlas': { path: 'Projects/Atlas/logs', title: 'Atlas (AI-OS & Automation Engine)' },\n  'courses': { path: 'Courses', title: 'Образование и курсы (Courses)' },\n  'dacha': { path: 'Projects/Dacha/logs', title: 'Проект Дача' },\n  'nastya': { path: 'Projects/Nastya/logs', title: 'Проект Настя' },\n  'dzen': { path: 'Projects/Dzen/logs', title: 'Яндекс Дзен' },\n  'other': { path: 'Projects/Other/logs', title: 'Другие проекты (Other)' }\n};\n\nconst target = mapping[project] || mapping['atlas'];\nreturn [{\n  json: {\n    projectKey: project,\n    projectTitle: target.title,\n    repoPath: target.path\n  }\n}];\n"
+      },
+      "id": "a9cef575-e6b1-4fda-a260-f259c2e9df2b",
+      "name": "Resolve Project Path",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        16,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://api.github.com/repos/takeprofit83/second-brain/contents/{{ $json.repoPath }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "githubApi",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "28b1aef7-05bd-40a8-8877-e9dc3ea3f83b",
+      "name": "List Logs in GitHub",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        240,
+        480
+      ],
+      "credentials": {
+        "githubApi": {
+          "id": "weiRggkEa4tOfXAN",
+          "name": "atlas github token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const resp = $json;\nconst projectInfo = $('Resolve Project Path').first().json;\n\nif (resp.statusCode !== 200 || !Array.isArray(resp.body)) {\n  return [{\n    json: {\n      found: false,\n      error: 'Не удалось получить список файлов (HTTP ' + (resp.statusCode || 'unknown') + ')',\n      projectInfo: projectInfo\n    }\n  }];\n}\n\nconst files = resp.body.filter(f => \n  f.type === 'file' && \n  f.name.endsWith('.md') && \n  !f.name.endsWith('-raw.md') &&\n  !f.name.startsWith('.')\n);\n\nif (files.length === 0) {\n  return [{\n    json: {\n      found: false,\n      error: 'Конспекты для проекта ' + projectInfo.projectTitle + ' не найдены',\n      projectInfo: projectInfo\n    }\n  }];\n}\n\nfiles.sort((a, b) => b.name.localeCompare(a.name));\nconst latest = files[0];\n\nreturn [{\n  json: {\n    found: true,\n    latestFile: {\n      name: latest.name,\n      path: latest.path,\n      sha: latest.sha,\n      size: latest.size\n    },\n    projectInfo: projectInfo\n  }\n}];"
+      },
+      "id": "2b969ab7-0959-4364-ac52-d382a98cfa4c",
+      "name": "Pick Latest Conspect",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        464,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://api.github.com/repos/takeprofit83/second-brain/contents/{{ $json.latestFile.path }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "githubApi",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "15f481ba-ec1a-4b25-a21a-fe4adeb3b544",
+      "name": "Fetch Conspect Content",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        672,
+        480
+      ],
+      "credentials": {
+        "githubApi": {
+          "id": "weiRggkEa4tOfXAN",
+          "name": "atlas github token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const fetchResp = $json;\nconst pickData = $('Pick Latest Conspect').first().json;\n\nif (!pickData.found) {\n  return [{\n    json: {\n      statusCode: 404,\n      response: {\n        status: 'error',\n        message: pickData.error || 'Логи не найдены'\n      }\n    }\n  }];\n}\n\nlet content = '';\nconst b = fetchResp.body || fetchResp;\n\nif (b && typeof b.content === 'string') {\n  try {\n    content = Buffer.from(b.content, 'base64').toString('utf-8');\n  } catch(e) {\n    content = b.content;\n  }\n} else if (typeof b === 'string') {\n  content = b;\n} else if (b && typeof b === 'object') {\n  content = JSON.stringify(b, null, 2);\n}\n\nif (!content || content.trim().length === 0) {\n  return [{\n    json: {\n      statusCode: 500,\n      response: {\n        status: 'error',\n        message: 'Файл конспекта пуст или не удалось прочитать содержимое (HTTP ' + (fetchResp.statusCode || 'unknown') + ')'\n      }\n    }\n  }];\n}\n\nconst projectInfo = pickData.projectInfo;\nconst filename = pickData.latestFile.name;\n\nlet formattedDate = 'недавнее';\nconst tsMatch = filename.match(/^(\\d{4})(\\d{2})(\\d{2})-(\\d{2})(\\d{2})(\\d{2})/);\nif (tsMatch) {\n  formattedDate = tsMatch[1] + '-' + tsMatch[2] + '-' + tsMatch[3] + ' ' + tsMatch[4] + ':' + tsMatch[5] + ':' + tsMatch[6];\n}\n\nconst prompt = 'Ты продолжаешь работу над проектом: **' + projectInfo.projectTitle + '**.\\n\\n' +\n  'Ниже приведён актуальный технический контекст передачи (handoff) от предыдущей AI-сессии.\\n' +\n  'Источник: `' + pickData.latestFile.path + '`\\n' +\n  'Дата фиксации: ' + formattedDate + '\\n\\n' +\n  '==================== [АКТУАЛЬНЫЙ СРЕЗ КОНТЕКСТА] ====================\\n\\n' +\n  content + '\\n\\n' +\n  '====================================================================\\n\\n' +\n  'Инструкция для ассистента:\\n' +\n  '1. Внимательно изучи текущее состояние проекта, принятые решения и действующие ограничения.\\n' +\n  '2. В ответе кратко подтверди, что контекст принят.\\n' +\n  '3. Назови текущий шаг по оставшемуся плану и предложи конкретное следующее действие для продолжения работы.';\n\nreturn [{\n  json: {\n    statusCode: 200,\n    response: {\n      status: 'ok',\n      project: projectInfo.projectKey,\n      projectTitle: projectInfo.projectTitle,\n      filename: filename,\n      filePath: pickData.latestFile.path,\n      updatedAt: formattedDate,\n      contentLength: content.length,\n      prompt: prompt\n    }\n  }\n}];"
+      },
+      "id": "1e684cb1-d260-494e-bb24-562c2444ed3e",
+      "name": "Build Handoff Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        896,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json.response) }}",
+        "options": {
+          "responseCode": "={{ $json.statusCode }}"
+        }
+      },
+      "id": "af62b415-f5bd-43eb-83b9-07bb735ed582",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        1120,
+        480
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "Resolve Project Path",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resolve Project Path": {
+      "main": [
+        [
+          {
+            "node": "List Logs in GitHub",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List Logs in GitHub": {
+      "main": [
+        [
+          {
+            "node": "Pick Latest Conspect",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pick Latest Conspect": {
+      "main": [
+        [
+          {
+            "node": "Fetch Conspect Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Conspect Content": {
+      "main": [
+        [
+          {
+            "node": "Build Handoff Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Handoff Prompt": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

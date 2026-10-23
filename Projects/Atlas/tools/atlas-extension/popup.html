@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    width: 380px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: #0d1117;
+    color: #e6edf3;
+    padding: 16px;
+    font-size: 13px;
+  }
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #30363d;
+  }
+  .logo-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 15px;
+    font-weight: 600;
+    color: #58a6ff;
+  }
+  .logo-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #2a6df4;
+    box-shadow: 0 0 8px #2a6df4;
+  }
+  .nav-tabs {
+    display: flex;
+    gap: 6px;
+    background: #161b22;
+    padding: 4px;
+    border-radius: 8px;
+    margin-bottom: 14px;
+    border: 1px solid #30363d;
+  }
+  .nav-tab {
+    flex: 1;
+    text-align: center;
+    padding: 8px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 500;
+    font-size: 13px;
+    color: #8b949e;
+    transition: all 0.15s;
+  }
+  .nav-tab.active {
+    background: #21262d;
+    color: #f0f6fc;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+  }
+  .section { display: none; }
+  .section.active { display: block; }
+
+  .status-box {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 14px;
+    line-height: 1.4;
+    font-size: 13px;
+    color: #c9d1d9;
+  }
+  .btn-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+  .proj-btn {
+    padding: 10px 4px;
+    border-radius: 6px;
+    border: none;
+    font-weight: 600;
+    font-size: 12px;
+    color: #fff;
+    cursor: pointer;
+    text-align: center;
+    transition: transform 0.1s, filter 0.15s;
+  }
+  .proj-btn:hover { filter: brightness(1.15); transform: translateY(-1px); }
+  .proj-btn:active { transform: translateY(1px); }
+
+  .btn-primary {
+    width: 100%;
+    padding: 12px;
+    border-radius: 6px;
+    border: none;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    background: #238636;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-bottom: 8px;
+    transition: all 0.15s;
+  }
+  .btn-primary:hover { background: #2ea043; }
+  .btn-secondary {
+    width: 100%;
+    padding: 10px;
+    border-radius: 6px;
+    border: 1px solid #30363d;
+    background: #21262d;
+    color: #c9d1d9;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+  .btn-secondary:hover { background: #30363d; color: #fff; }
+
+  .meta-card {
+    background: #0d1117;
+    border: 1px solid #21262d;
+    border-radius: 6px;
+    padding: 10px;
+    margin-bottom: 12px;
+    font-size: 12px;
+  }
+  .meta-title { font-weight: 600; color: #58a6ff; margin-bottom: 4px; }
+  .meta-detail { color: #8b949e; margin-bottom: 2px; }
+
+  .quick-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid #21262d;
+    justify-content: center;
+  }
+  .quick-link {
+    font-size: 11px;
+    color: #8b949e;
+    text-decoration: none;
+    background: #161b22;
+    padding: 4px 8px;
+    border-radius: 4px;
+    border: 1px solid #21262d;
+  }
+  .quick-link:hover { color: #58a6ff; border-color: #30363d; }
+  .spinner {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 2px solid rgba(255,255,255,.3);
+    border-radius: 50%;
+    border-top-color: #fff;
+    animation: spin 0.8s linear infinite;
+    vertical-align: middle;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .badge {
+    display: inline-block;
+    padding: 2px 6px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+    background: #1f6feb;
+    color: #fff;
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo-title">
+    <div class="logo-dot"></div>
+    <span>Atlas AI-OS Companion</span>
+  </div>
+  <span id="platform-badge" class="badge">Авто</span>
+</div>
+
+<div class="nav-tabs">
+  <div class="nav-tab active" id="tab-resume-btn">📥 Подхватить</div>
+  <div class="nav-tab" id="tab-capture-btn">📤 Захватить</div>
+</div>
+
+<!-- СЕКЦИЯ 1: ПОДХВАТ КОНТЕКСТА (RESUME) -->
+<div class="section active" id="sec-resume">
+  <div class="status-box" id="resume-status">
+    Выберите проект для загрузки последнего handoff:
+  </div>
+
+  <div class="btn-grid" id="resume-buttons">
+    <button class="proj-btn" style="background:#2a6df4" data-key="atlas">Atlas</button>
+    <button class="proj-btn" style="background:#2fa84f" data-key="courses">Курс</button>
+    <button class="proj-btn" style="background:#e6492d" data-key="dzen">Дзен</button>
+    <button class="proj-btn" style="background:#e0468c" data-key="nastya">Настя</button>
+    <button class="proj-btn" style="background:#d98c1f" data-key="dacha">Дача</button>
+    <button class="proj-btn" style="background:#8957e5" data-key="other">Другое</button>
+  </div>
+
+  <div id="resume-actions" style="display:none;">
+    <div class="meta-card" id="resume-meta"></div>
+    <button class="btn-primary" id="btn-copy-context">📋 Скопировать в буфер</button>
+    <button class="btn-secondary" id="btn-inject-context">⚡ Вставить прямо в чат</button>
+  </div>
+
+  <div class="quick-links">
+    <a href="https://claude.ai/new" target="_blank" class="quick-link">Claude</a>
+    <a href="https://chatgpt.com" target="_blank" class="quick-link">ChatGPT</a>
+    <a href="https://chat.deepseek.com" target="_blank" class="quick-link">DeepSeek</a>
+    <a href="https://gemini.google.com/app" target="_blank" class="quick-link">Gemini</a>
+    <a href="https://kimi.moonshot.cn" target="_blank" class="quick-link">Kimi</a>
+  </div>
+</div>
+
+<!-- СЕКЦИЯ 2: ЗАХВАТ ДИАЛОГА (CAPTURE) -->
+<div class="section" id="sec-capture">
+  <div class="status-box" id="capture-status">
+    Определение активного чата…
+  </div>
+
+  <button class="btn-primary" id="btn-read-chat" style="display:none;">
+    🔍 Прочитать диалог со страницы
+  </button>
+
+  <div id="capture-picker" style="display:none;">
+    <div style="font-size:12px; color:#8b949e; margin-bottom:8px;">Куда сохранить конспект?</div>
+    <div class="btn-grid" id="capture-buttons">
+      <button class="proj-btn" style="background:#2a6df4" data-key="atlas">Atlas</button>
+      <button class="proj-btn" style="background:#2fa84f" data-key="courses">Курс</button>
+      <button class="proj-btn" style="background:#e6492d" data-key="dzen">Дзен</button>
+      <button class="proj-btn" style="background:#e0468c" data-key="nastya">Настя</button>
+      <button class="proj-btn" style="background:#d98c1f" data-key="dacha">Дача</button>
+      <button class="proj-btn" style="background:#8957e5" data-key="other">Другое</button>
+    </div>
+  </div>
+</div>
+
+<script src="popup.js"></script>
+</body>
+</html>

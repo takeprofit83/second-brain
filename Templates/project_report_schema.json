@@ -1,0 +1,82 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "AI-OS Execution Report Contract",
+  "description": "Схема отчёта о выполненной работе ИИ для обратной записи в Second Brain (Фаза C4 AI-OS)",
+  "type": "object",
+  "required": [
+    "project_id",
+    "summary",
+    "completed_actions",
+    "next_step"
+  ],
+  "properties": {
+    "project_id": {
+      "type": "string",
+      "enum": ["atlas", "courses", "dzen", "nastya", "dacha", "other"],
+      "description": "Идентификатор проекта"
+    },
+    "task_id": {
+      "type": "string",
+      "description": "Идентификатор сессии или задачи"
+    },
+    "source_ai": {
+      "type": "string",
+      "description": "Название или модель выполнившего ИИ (ChatGPT, Claude, Gemini, DeepSeek, Qwen, Kimi и др.)"
+    },
+    "summary": {
+      "type": "string",
+      "description": "Краткое описание выполненной работы"
+    },
+    "completed_actions": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Фактически выполненные действия"
+    },
+    "pending_actions": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Незавершённые действия"
+    },
+    "files_modified": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Изменённые или созданные файлы"
+    },
+    "decisions_made": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["title"],
+        "properties": {
+          "id": { "type": "string" },
+          "title": { "type": "string" },
+          "description": { "type": "string" }
+        }
+      },
+      "description": "Принятые решения"
+    },
+    "new_facts": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Новые подтверждённые факты"
+    },
+    "new_questions": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Новые открытые вопросы"
+    },
+    "constraints_discovered": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Обнаруженные ограничения или запреты"
+    },
+    "next_step": {
+      "type": "string",
+      "description": "Конкретный следующий шаг для продолжения работы"
+    },
+    "suggested_handoff": {
+      "type": "string",
+      "description": "Предлагаемый обновлённый текст handoff для следующего агента"
+    }
+  }
+}

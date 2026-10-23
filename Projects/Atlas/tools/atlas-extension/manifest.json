@@ -1,0 +1,36 @@
+{
+  "manifest_version": 3,
+  "name": "Atlas AI-OS Companion",
+  "version": "1.0.0",
+  "description": "Единый мост для бесшовного переноса и захвата контекста между ChatGPT, Claude, DeepSeek, Gemini, Qwen и Kimi",
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "clipboardWrite",
+    "storage"
+  ],
+  "host_permissions": [
+    "https://n8n.neiroclone.ru/*",
+    "https://chatgpt.com/*",
+    "https://claude.ai/*",
+    "https://chat.deepseek.com/*",
+    "https://gemini.google.com/*",
+    "https://chat.qwen.ai/*",
+    "https://kimi.moonshot.cn/*",
+    "https://kimi.ai/*",
+    "https://www.kimi.ai/*"
+  ]
+}

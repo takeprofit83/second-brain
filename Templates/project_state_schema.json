@@ -1,0 +1,119 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "AI-OS Project State Contract",
+  "description": "Единый контракт состояния проекта в Second Brain (Фаза B AI-OS)",
+  "type": "object",
+  "required": [
+    "project_id",
+    "title",
+    "target_goal",
+    "status",
+    "updated_at",
+    "state_version",
+    "next_step"
+  ],
+  "properties": {
+    "project_id": {
+      "type": "string",
+      "enum": ["atlas", "courses", "dzen", "nastya", "dacha", "other"],
+      "description": "Стабильный уникальный идентификатор проекта"
+    },
+    "title": {
+      "type": "string",
+      "description": "Название проекта"
+    },
+    "target_goal": {
+      "type": "string",
+      "description": "Главная цель и предназначение проекта"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["active", "paused", "maintenance", "completed", "in_progress"],
+      "description": "Текущий операционный статус проекта"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Метка времени последнего обновления (ISO 8601 UTC)"
+    },
+    "state_version": {
+      "type": "string",
+      "description": "Версия состояния проекта (semver или timestamp/commit-hash)"
+    },
+    "handoff_summary": {
+      "type": "string",
+      "description": "Компактный снимок контекста для быстрой передачи следующему ИИ"
+    },
+    "confirmed_facts": {
+      "type": "array",
+      "description": "Подтверждённые факты с указанием даты или источника",
+      "items": {
+        "type": "object",
+        "required": ["fact"],
+        "properties": {
+          "fact": { "type": "string" },
+          "source": { "type": "string" },
+          "date": { "type": "string" }
+        }
+      }
+    },
+    "decisions": {
+      "type": "array",
+      "description": "Принятые архитектурные и технические решения",
+      "items": {
+        "type": "object",
+        "required": ["id", "title"],
+        "properties": {
+          "id": { "type": "string" },
+          "title": { "type": "string" },
+          "date": { "type": "string" },
+          "status": { "type": "string" }
+        }
+      }
+    },
+    "open_questions": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Нерешённые открытые вопросы"
+    },
+    "assumptions": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Рабочие гипотезы и предположения"
+    },
+    "constraints": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Действующие ограничения и запреты"
+    },
+    "current_tasks": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Текущие активные задачи"
+    },
+    "completed_actions": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Фактически выполненные действия"
+    },
+    "pending_actions": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Незавершённые или отложенные действия"
+    },
+    "document_links": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Относительные ссылки на ключевые документы в Second Brain"
+    },
+    "artifacts": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Ссылки на полученные результаты и артефакты"
+    },
+    "next_step": {
+      "type": "string",
+      "description": "Следующий конкретный рабочий шаг"
+    }
+  }
+}

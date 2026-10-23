@@ -333,6 +333,64 @@ Not built yet — this is a proposal, delivered to the user in chat, not impleme
 
 ---
 
+# 2026-10-23 — Context-Resume / Read-side Architecture designed (deferred)
+
+User clarified the core motivation of Atlas: seamless transition between AI models without loss of context and seamless continuation of work.
+Analyzed current state: Write-pipeline (Capture bookmarklets + Relay + n8n + GitHub) is complete and verified, but Read-pipeline (loading/injecting context into a fresh chat window) remains a manual friction step.
+Architected the reverse process (Resume):
+1. **n8n Workflow `Atlas - Context Resume`**: Webhook (`/webhook/atlas-context-resume`) receiving `project` parameter, querying GitHub API (`Contents/Projects/<project>/logs`), picking the latest `.md` file (excluding `-raw.md`, alphabetical descending sort = chronological), formatting the handoff prompt (`Ты продолжаешь работу над проектом...`), and returning JSON.
+2. **Relay Page extension**: Adding `?action=resume` mode communicating with the calling window via cross-origin `postMessage` (bypassing strict chat CSP on ChatGPT/Claude/DeepSeek/Gemini) with clipboard fallback.
+3. **Universal Bookmarklet `Atlas: Подхватить контекст`**: Opens relay popup, receives handoff payload via `postMessage`, auto-detects chat input element (`#prompt-textarea`, `.ProseMirror`, `textarea`, `rich-textarea`), inserts the handoff text via `document.execCommand('insertText')` / input events, and copies to clipboard.
+
+Status: IMPLEMENTED AND VERIFIED END-TO-END IN PRODUCTION (2026-10-23).
+- Workflow `Atlas - Context Resume` created, imported, and activated in n8n.
+- Relay Page deployed to `tangerine-vps` with dual-mode support (Capture & Resume).
+- Tested and confirmed working by user across browser chat interfaces. Seamless transition loop officially closed.
+
+---
+
+
+---
+
+# 2026-10-23 — Added Dzen project button & Kimi (Moonshot AI) capture bookmarklet
+
+User requested two additions:
+1. **Project Dzen (Дзен)**:
+   - Added `{ key: 'dzen', label: 'Дзен', color: '#e6492d' }` to Relay page.
+   - Deployed updated relay page to `tangerine-vps` (verified via SSH grep).
+   - Created folder `Projects/Dzen/logs/` with `.gitkeep`.
+   - Updated `atlas-context-resume.json` to resolve `dzen` -> `Projects/Dzen/logs`.
+2. **Kimi AI Capture Bookmarklet**:
+   - Built `kimi-capture-bookmarklet.js` and `kimi-capture-bookmarklet-REAL-SECRET.uri.txt`.
+   - Dual-engine design: calls Kimi internal API (`/api/chat/<id>/segment/scroll`) with auto-detected token from `localStorage`, with automated fallback to DOM message turn extraction.
+   - Forwards to Relay page with `source: 'kimi'`.
+
+
+
+---
+
+# 2026-10-23 — Added "Other" (Другое) project button & directory
+
+User requested adding a general/fallback category:
+- **Button in Relay**: `{ key: 'other', label: 'Другое', color: '#8957e5' }`. Deployed to `tangerine-vps`.
+- **Repository directory**: `Projects/Other/logs/` created with `.gitkeep`.
+- **Context Resume mapping**: Added `'other': { path: 'Projects/Other/logs', title: 'Прочие проекты (Другое)' }` in `atlas-context-resume.json`.
+
+
+
+---
+
+# 2026-10-23 — Built Atlas AI-OS Companion (Universal Chromium Extension)
+
+User suggested consolidating bookmarklets into a single browser extension to avoid manual bookmark management across browsers:
+- **Location**: `D:\YandexDisk\Atlas\atlas-extension` (mirrored to `tools/atlas-extension`).
+- **Manifest V3**: Works in Chrome, Yandex Browser, Edge, Brave, Opera.
+- **Dual Tab Architecture**:
+  1. `📥 Подхватить (Resume)`: 1-click fetch from n8n + copy to clipboard + direct DOM paste into chat (`⚡ Вставить прямо в чат`).
+  2. `📤 Захватить (Capture)`: Auto-detects platform (ChatGPT, Claude, DeepSeek, Gemini, Qwen, Kimi), reads conversation turns, and sends to `atlas-capture` for the chosen project.
+- Replaces all standalone bookmarklets with a single browser extension.
+
+
 # User Preferences During Development
 
 - Short answers.

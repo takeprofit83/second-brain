@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Atlas Relay & Context Hub</title>
+<style>
+  * { box-sizing: border-box; }
+  body { 
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: #0f1117; 
+    color: #e6edf3; 
+    display: flex; 
+    flex-direction: column;
+    align-items: center; 
+    justify-content: center; 
+    min-height: 100vh; 
+    margin: 0; 
+    padding: 16px;
+  }
+  .card {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 12px;
+    padding: 24px;
+    width: 100%;
+    max-width: 440px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+    text-align: center;
+  }
+  h2 { margin: 0 0 16px 0; font-size: 19px; font-weight: 600; color: #58a6ff; }
+  .status { font-size: 15px; margin-bottom: 16px; color: #8b949e; line-height: 1.4; }
+  .btn-group { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-bottom: 16px; }
+  button {
+    font-size: 15px;
+    font-weight: 500;
+    padding: 10px 18px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    color: #fff;
+    transition: transform 0.1s, filter 0.15s;
+  }
+  button:hover { filter: brightness(1.15); transform: translateY(-1px); }
+  button:active { transform: translateY(1px); }
+  
+  .btn-copy {
+    background: #238636;
+    font-size: 16px;
+    padding: 14px 20px;
+    width: 100%;
+    margin-top: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+  .btn-copy.copied { background: #1f6feb; }
+
+  .meta-box {
+    background: #0d1117;
+    border: 1px solid #21262d;
+    border-radius: 8px;
+    padding: 12px;
+    font-size: 13px;
+    text-align: left;
+    margin: 14px 0;
+    color: #c9d1d9;
+    max-height: 140px;
+    overflow-y: auto;
+  }
+  .meta-title { font-weight: 600; color: #79c0ff; margin-bottom: 4px; }
+  .quick-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    justify-content: center;
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px solid #21262d;
+  }
+  .quick-links a {
+    font-size: 12px;
+    color: #8b949e;
+    text-decoration: none;
+    background: #21262d;
+    padding: 4px 10px;
+    border-radius: 6px;
+  }
+  .quick-links a:hover { color: #58a6ff; background: #30363d; }
+  .spinner {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 3px solid rgba(255,255,255,.2);
+    border-radius: 50%;
+    border-top-color: #58a6ff;
+    animation: spin 0.8s linear infinite;
+    vertical-align: middle;
+    margin-right: 8px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<div class="card" id="main-card">
+  <h2 id="header-title">Atlas Context Hub</h2>
+  <div id="status" class="status">Определение режима…</div>
+  
+  <div id="project-picker" style="display:none;">
+    <div style="margin-bottom:12px; font-size:14px; color:#c9d1d9;" id="picker-prompt">Выберите проект:</div>
+    <div class="btn-group" id="picker-buttons"></div>
+  </div>
+
+  <div id="resume-result" style="display:none;">
+    <div class="meta-box" id="result-meta"></div>
+    <button class="btn-copy" id="btn-copy" onclick="copyContext()">📋 Скопировать для нового чата</button>
+    <div style="font-size:12px; color:#8b949e; margin-top:8px;">Нажмите и затем вставьте (Ctrl+V) в поле ввода модели</div>
+    <div class="quick-links">
+      <a href="https://claude.ai/new" target="_blank">Claude</a>
+      <a href="https://chatgpt.com" target="_blank">ChatGPT</a>
+      <a href="https://chat.deepseek.com" target="_blank">DeepSeek</a>
+      <a href="https://gemini.google.com/app" target="_blank">Gemini</a>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var PROJECTS = [
+    { key: 'atlas', label: 'Atlas', color: '#2a6df4' },
+    { key: 'courses', label: 'Курс', color: '#2fa84f' },
+    { key: 'dzen', label: 'Дзен', color: '#e6492d' },
+    { key: 'nastya', label: 'Настя', color: '#e0468c' },
+    { key: 'dacha', label: 'Дача', color: '#d98c1f' },
+    { key: 'other', label: 'Другое', color: '#8957e5' }
+  ];
+
+  var N8N_CAPTURE_URL = 'https://n8n.neiroclone.ru/webhook/atlas-capture';
+  var N8N_RESUME_URL  = 'https://n8n.neiroclone.ru/webhook/atlas-context-resume';
+  var WEBHOOK_SECRET  = '4a1cc5534eab63ca1ffebb4346c749551e994450e8b9d7fb';
+
+  var statusEl = document.getElementById('status');
+  var titleEl = document.getElementById('header-title');
+  var pickerEl = document.getElementById('project-picker');
+  var pickerPrompt = document.getElementById('picker-prompt');
+  var buttonsEl = document.getElementById('picker-buttons');
+  var resultEl = document.getElementById('resume-result');
+  var metaEl = document.getElementById('result-meta');
+  var btnCopy = document.getElementById('btn-copy');
+
+  var currentMode = 'capture'; // 'capture' or 'resume'
+  var pendingData = null;
+  var loadedPrompt = '';
+
+  function setStatus(html) { statusEl.innerHTML = html; }
+
+  // 1. Определение режима работы
+  var params = new URLSearchParams(window.location.search);
+  if (params.get('action') === 'resume' || params.get('mode') === 'resume') {
+    initResumeMode();
+  } else {
+    initCaptureMode();
+  }
+
+  // РЕЖИМ 1: ЗАХВАТ (CAPTURE)
+  function initCaptureMode() {
+    currentMode = 'capture';
+    titleEl.textContent = 'Atlas Захват контекста';
+    setStatus('Ожидаю данные из диалога…');
+
+    window.addEventListener('message', function (event) {
+      if (event.source !== window.opener) return;
+      var data = event.data;
+      if (!data || data.type !== 'atlas-payload') return;
+
+      pendingData = data;
+      setStatus('Данные получены (' + (data.text ? data.text.length : 0) + ' симв.).');
+      pickerPrompt.textContent = 'Куда сохранить конспект?';
+      showProjects(onCaptureProjectSelect);
+    });
+
+    if (window.opener) {
+      window.opener.postMessage({ type: 'atlas-ready' }, '*');
+    } else {
+      setStatus('Эта страница открывается букмарклетом Atlas Capture.<br><br><a href="?action=resume" style="color:#58a6ff;">Переключиться в режим подхвата контекста</a>');
+    }
+  }
+
+  function onCaptureProjectSelect(proj) {
+    pickerEl.style.display = 'none';
+    setStatus('<span class="spinner"></span>Отправляю в ' + proj.label + '…');
+    fetch(N8N_CAPTURE_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Atlas-Secret': WEBHOOK_SECRET },
+      body: JSON.stringify({ 
+        text: pendingData.text, 
+        provider: pendingData.provider || 'Kie', 
+        project: proj.key,
+        source: pendingData.source || 'unknown',
+        chatId: pendingData.chatId || null
+      })
+    }).then(function (resp) {
+      if (resp.ok) {
+        setStatus('✅ Конспект успешно сохранён в <b>' + proj.label + '</b>!<br>Окно закроется через 2с.');
+        setTimeout(function () { window.close(); }, 2000);
+      } else {
+        setStatus('❌ Ошибка сохранения: HTTP ' + resp.status);
+      }
+    }).catch(function (err) {
+      setStatus('❌ Ошибка сети: ' + err.message);
+    });
+  }
+
+  // РЕЖИМ 2: ПОДХВАТ КОНТЕКСТА (RESUME)
+  function initResumeMode() {
+    currentMode = 'resume';
+    titleEl.textContent = 'Atlas Подхват контекста';
+    setStatus('Выберите проект для загрузки последнего handoff:');
+    pickerPrompt.textContent = 'Из какого проекта взять контекст?';
+    showProjects(onResumeProjectSelect);
+  }
+
+  function showProjects(handler) {
+    buttonsEl.innerHTML = '';
+    PROJECTS.forEach(function (p) {
+      var btn = document.createElement('button');
+      btn.textContent = p.label;
+      btn.style.background = p.color;
+      btn.addEventListener('click', function () { handler(p); });
+      buttonsEl.appendChild(btn);
+    });
+    pickerEl.style.display = 'block';
+  }
+
+  function onResumeProjectSelect(proj) {
+    pickerEl.style.display = 'none';
+    setStatus('<span class="spinner"></span>Запрашиваю последний контекст для <b>' + proj.label + '</b>…');
+
+    fetch(N8N_RESUME_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Atlas-Secret': WEBHOOK_SECRET },
+      body: JSON.stringify({ project: proj.key })
+    }).then(function (resp) {
+      return resp.json().then(function (data) {
+        if (!resp.ok || data.status === 'error') {
+          throw new Error(data.message || ('HTTP ' + resp.status));
+        }
+        return data;
+      });
+    }).then(function (data) {
+      loadedPrompt = data.prompt;
+      setStatus('✅ Контекст актуален и готов к передаче.');
+      metaEl.innerHTML = '<div class="meta-title">' + (data.projectTitle || proj.label) + '</div>' +
+        '<div><b>Файл:</b> ' + (data.filename || 'срез') + '</div>' +
+        '<div><b>Обновлено:</b> ' + (data.updatedAt || 'недавно') + '</div>' +
+        '<div><b>Объём:</b> ~' + Math.round((data.contentLength || 0)/1000) + ' тыс. знаков</div>';
+      resultEl.style.display = 'block';
+      
+      // Автоматическое копирование при загрузке (если браузер позволяет)
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(loadedPrompt).then(function() {
+          btnCopy.classList.add('copied');
+          btnCopy.textContent = '✅ СКОПИРОВАНО В БУФЕР!';
+        }).catch(function(){});
+      }
+    }).catch(function (err) {
+      setStatus('❌ Не удалось получить контекст: ' + err.message + '<br><br><button onclick="location.reload()" style="background:#30363d;">Попробовать снова</button>');
+    });
+  }
+
+  window.copyContext = function () {
+    if (!loadedPrompt) return;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(loadedPrompt).then(function () {
+        btnCopy.classList.add('copied');
+        btnCopy.textContent = '✅ СКОПИРОВАНО! ВСТАВЬТЕ В ЧАТ (Ctrl+V)';
+      }).catch(function () {
+        fallbackCopy();
+      });
+    } else {
+      fallbackCopy();
+    }
+  };
+
+  function fallbackCopy() {
+    var ta = document.createElement('textarea');
+    ta.value = loadedPrompt;
+    document.body.appendChild(ta);
+    ta.select();
+    try {
+      document.execCommand('copy');
+      btnCopy.classList.add('copied');
+      btnCopy.textContent = '✅ СКОПИРОВАНО (Ctrl+V)';
+    } catch(e) {
+      alert('Не удалось скопировать автоматически. Выделите текст вручную.');
+    }
+    document.body.removeChild(ta);
+  }
+})();
+</script>
+</body>
+</html>

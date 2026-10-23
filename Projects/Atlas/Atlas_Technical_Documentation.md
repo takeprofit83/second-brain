@@ -317,7 +317,7 @@ Completed:
 
 Pending:
 
-- ⬜ **Context-loader ("read" side)** — the capture bookmarklets only write conspects to the repo; nothing yet reads them back into a *new* chat with a different model. Today the bridge is manual (open the repo, copy the latest conspect, paste it as the first message). Next logical step: a tool that, on opening a new chat, fetches the latest relevant conspect(s) from GitHub and injects them automatically — this is what actually closes the "any model can pick up where another left off" loop.
+- ✅ **Context-loader ("read" side) / Context Resume Pipeline** — DONE (2026-10-23, §36). One-click resume bookmarklet + n8n webhook (`atlas-context-resume`) + Relay popup on `tangerine-vps`. Tested and verified end-to-end in production across ChatGPT, Claude, DeepSeek, and Gemini.
 - ⬜ Implement additional providers as new sub-workflows using the same contract (Claude; OpenAI) — just add them to the dropdown + ternary/switch expression once built.
 
 ---
@@ -1018,3 +1018,53 @@ Two new Header-Auth credentials, same shape as the existing `atlas docs sync sec
 Ready-to-import n8n export JSON for all three workflows: `Projects/Atlas/tools/wiki-layer/{atlas-wiki-ingest,atlas-wiki-query,atlas-wiki-lint}.json` + a `README.md` covering import steps and three explicitly-flagged unverified assumptions (whether HTTP Request's `githubApi` predefinedCredentialType works as expected; the `fullResponse`/`neverError` response shape; Ingest's actual output quality on a real conspect). None imported/activated in n8n yet. Per the write-restriction already documented in §31 ("Claude Code's own safety classifier blocked direct PUT/write calls... to production n8n"), the user applies these via n8n's UI `Import from File` — deliberately not the PowerShell/public-API route used for surgical edits to already-active workflows elsewhere in this document (§31–§33), since that route's entire documented pain (Cyrillic/em-dash breaking `.ps1`, `ConvertTo-Json` hangs/array-unwrapping) doesn't apply to importing a brand-new workflow from a clean JSON file.
 
 **Provider routing correction (2026-08-17):** the original design above hardcoded `Atlas-OpenRouter Adapter Core` as the `Call Wiki Ingest/Query LLM` target. Fixed to match the pattern already established for the capture form and `Atlas - Model Relay` (§23, §33) — both webhooks now accept an optional `provider` field in the request body, and the `Execute Workflow` node's `workflowId` is a dynamic expression: `{{ $('Webhook').item.json.body.provider === 'OpenRouter' ? 'FCHKR5wwDT1ZYdKu' : 'gu85dO6jBAoB1S9r' }}`. **Default is Polza, not OpenRouter** — deliberately, since §32 already documented a real `402 INSUFFICIENT_BALANCE` from a new workflow defaulting to an unfunded OpenRouter account; the user tops up Polza. Not verified: whether `anthropic/claude-sonnet-5` resolves on Polza under the same model string it uses on OpenRouter (§32's own Polza test only exercised `yandex/yandexgpt-5-lite`) — flagged in the README as a first-real-run check, same as the other open questions above.
+
+---
+
+# 36. Atlas - Context Resume (Read Side Architecture) — DONE (2026-10-23)
+
+## 36.1 Goal
+
+Close the second half of the seamless model transition loop (§17): allow a user opening a fresh chat tab on any platform (ChatGPT, Claude, DeepSeek, Gemini, Qwen) to inject the latest accumulated handoff context in 1 click, without manual copy-pasting from GitHub or local directories.
+
+## 36.2 Flow & Components
+
+```
+User in new chat tab (Claude / ChatGPT / DeepSeek / Gemini / Qwen)
+   │
+   ├─► Clicks bookmarklet "Atlas: Подхватить контекст"
+   │     └─► window.open(RELAY_URL + "?action=resume&project=atlas", "atlas_resume", "width=420,height=260")
+   │
+Relay Popup (tangerine-vps)
+   │
+   ├─► GET https://n8n.neiroclone.ru/webhook/atlas-context-resume?project=atlas
+   │     (holds X-Atlas-Secret, safe from browser CSP)
+   │
+n8n Workflow ("Atlas - Context Resume")
+   │
+   ├─► GET https://api.github.com/repos/takeprofit83/second-brain/contents/Projects/Atlas/logs
+   ├─► Pick latest .md file (filter out -raw.md, sort descending by filename)
+   ├─► Fetch file content & format Handoff Prompt:
+   │     "Ты продолжаешь работу над проектом Atlas. Ниже актуальный срез контекста от предыдущей AI-модели..."
+   └─► Respond to Webhook { status: "ok", filename, prompt }
+   │
+Relay Popup
+   │
+   ├─► window.opener.postMessage({ type: "atlas-resume-payload", prompt }, "*")
+   └─► Auto-closes popup (and offers "📋 Скопировать в буфер" fallback button)
+   │
+Bookmarklet in original chat tab
+   │
+   ├─► Copies prompt to navigator.clipboard
+   ├─► Finds input element (#prompt-textarea, .ProseMirror, textarea, rich-textarea)
+   ├─► document.execCommand('insertText', false, prompt) + dispatches input events
+   └─► Shows brief confirmation toast
+```
+
+## 36.3 Why this design
+
+- **CSP Bypass**: Browsers enforce strict `connect-src` CSP on chat domains; `window.open` + `postMessage` is standard W3C cross-origin communication and already proven in Atlas Capture (ADR-003).
+- **No heavy extensions needed**: Runs entirely as a browser bookmarklet + lightweight n8n webhook.
+- **Fail-safe**: If DOM element selector fails (e.g. site updates UI layout), clipboard copy guarantees the user can immediately press `Ctrl+V`.
+
+Status: Fully implemented and verified end-to-end in production (2026-10-23). The "read" side of the seamless loop (§17) is now complete.

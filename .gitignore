@@ -1,0 +1,13 @@
+# Second Brain Git Ignore
+
+# Secrets & API Keys (Strictly local, never push to GitHub)
+*.env
+*.env.*
+*.key
+Projects/Atlas/openrouter.md
+Projects/Atlas/proxyapi.ru.md
+secrets/
+
+# OS / Editor temporary files
+.DS_Store
+Thumbs.db

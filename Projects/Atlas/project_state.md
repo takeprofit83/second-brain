@@ -8,26 +8,22 @@ tags:
   - core
 project: "atlas"
 status: "active"
-updated_at: "2026-10-24T16:15:00.000Z"
-last_agent: "kimi"
-last_log: "20261023-065420-kimi.md"
-next_steps: "После получения трёх ответов — начать аудит проектов по порядку: сначала Dzen-Studio (архитектура, личный вклад, реализация, результаты), затем PANFEROVA/подология. Итогом сформировать реестр «навык → уровень самостоятельности → доказательство → бизнес-ценность → услуга»."
+updated_at: "2026-10-27T23:49:35.490471Z"
+last_agent: "antigravity"
+last_log: "20261027-234935-antigravity.md"
+next_steps: "Restart Claude Desktop so it loads the new MCP servers from claude_desktop_config.json; Claude Desktop will now automatically see Second Brain tools and project state."
 active_blockers: "None"
 ---
 
-# Project State: Atlas AI-OS
+# Project State: Atlas
 
 ## Current Objective & Status
-- **Last Updated:** 2026-10-24T16:15:00Z by `kimi`
-- **Recent Progress:** Подтверждена целостность захвата (конспект + GenUI-виджет читаются полностью, UTF-8 чистая). Форма «Уточнение бизнес-направления» воспроизведена с фиксацией ответов и отправкой в чат. Варианты и логика кнопки сохранены из сессии, сообщение сформулировано как продолжение диалога.
+- **Last Updated:** 2026-10-27T23:49:35.490471Z by `antigravity`
+- **Recent Progress:** Configured MCP Bridge for Claude Desktop and Claude Code with full access to Second Brain (ai-os-second-brain MCP server + filesystem MCP). Connected global CLAUDE.md and Content-Fabric CLAUDE.md so all desktop Claude sessions seamlessly receive Tier 1 memory and can save state autonomously.
 - **Active Blockers:** None
 
 ## Next Steps (Autonomous Queue)
-- После получения трёх ответов — начать аудит проектов по порядку: сначала Dzen-Studio (архитектура, личный вклад, реализация, результаты), затем PANFEROVA/подология. Итогом сформировать реестр «навык → уровень самостоятельности → доказательство → бизнес-ценность → услуга».
+- Restart Claude Desktop so it loads the new MCP servers from claude_desktop_config.json; Claude Desktop will now automatically see Second Brain tools and project state.
 
 ## Reference Documents & Links
-- Главный пульт: [[Dashboard|Second Brain & AI-OS Dashboard]]
-- Последний лог сессии: [[Projects/Atlas/logs/20261023-065420-kimi|Лог сессии Kimi (20261023-065420)]]
-- Предыдущий конспект: [[Projects/Atlas/logs/20261023-074500-antigravity-session-full|Архитектура Фазы 1 и Регламент GUI]]
-- Архитектурные решения: [[docs/DECISIONS|Реестр решений ADR-001 ... ADR-018]]
-- База знаний: [[Knowledge/index|Каталог знаний Wiki]]
+- Latest session log: `logs/20261027-234935-antigravity.md`

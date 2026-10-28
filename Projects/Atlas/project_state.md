@@ -8,22 +8,22 @@ tags:
   - core
 project: "atlas"
 status: "active"
-updated_at: "2026-10-28T03:54:53.753387Z"
-last_agent: "claude"
-last_log: "20261028-035453-claude.md"
-next_steps: "Проверить через пару дней реальной параллельной работы (Claude Code + Antigravity), что rejected-push больше не возникает / или возникает, но теперь успешно долечивается retry'ем. Если у других проектов (Courses/Nastya/Dacha) тот же паттерн 'агент не нашёл актуальную инструкцию без явного указания пользователя' — стоит свериться, не устарели ли их AGENTS.md/аналоги так же, как у Dzen."
+updated_at: "2026-10-28T22:50:56.458173Z"
+last_agent: "antigravity"
+last_log: "20261028-225056-antigravity.md"
+next_steps: "Перейти к аудиту Dzen-Studio для продающего сайта услуг (на базе спасённых сессий 24 модулей и онбординга) либо к реализации клиентского брифа каналов в Dzen-Studio."
 active_blockers: "None"
 ---
 
 # Project State: Atlas
 
 ## Current Objective & Status
-- **Last Updated:** 2026-10-28T03:54:53.753387Z by `claude`
-- **Recent Progress:** Пользователь пожаловался: "атлас полностью не работает, данные между моделями не синхронизируются" — приходится каждой сессии вручную объяснять, что где лежит. Нашёл конкретную причину: cmd_save в tools/ai_os.py коммитил и пушил БЕЗ предварительного git pull (в отличие от cmd_resume, который pull делает) — при параллельной работе нескольких агентов (Claude Code/Antigravity/Cursor) в один git-репозиторий это гарантированно давало rejected push, и коммит застревал неотправленным — следующий resume() другого агента его просто не видел. Поймал это живьём (мой собственный save для dzen отклонился именно так). Фикс: при отказе push теперь git pull -X ours (этот save новее — должен победить при конфликте) + повторный push один раз. Закоммичено и запушено (af7e512). Также нашёл и исправил смежную причину сегодняшнего инцидента с деплоем dzen-studio: AGENTS.md проекта Dzen (авто-загружается в КАЖДУЮ сессию) содержал устаревший протокол деплоя (локальная сборка + scp + pm2 reload) — заменил на актуальный deploy.sh-процесс (сборка на самом сервере), чтобы будущим сессиям не нужно было объяснять это вручную.
+- **Last Updated:** 2026-10-28T22:50:56.458173Z by `antigravity`
+- **Recent Progress:** Rescued all 96 historical Claude Code/Desktop sessions (1.3GB of dialogues/code) after Anthropic account ban. Extracted active sessions into Markdown, sanitized API keys, created Master Catalog in Knowledge/claude_sessions_archive_catalog.md, and verified sync across all alternative agents (Cursor, Qwen Code, DeepSeek, Antigravity).
 - **Active Blockers:** None
 
 ## Next Steps (Autonomous Queue)
-- Проверить через пару дней реальной параллельной работы (Claude Code + Antigravity), что rejected-push больше не возникает / или возникает, но теперь успешно долечивается retry'ем. Если у других проектов (Courses/Nastya/Dacha) тот же паттерн "агент не нашёл актуальную инструкцию без явного указания пользователя" — стоит свериться, не устарели ли их AGENTS.md/аналоги так же, как у Dzen.
+- Перейти к аудиту Dzen-Studio для продающего сайта услуг (на базе спасённых сессий 24 модулей и онбординга) либо к реализации клиентского брифа каналов в Dzen-Studio.
 
 ## Reference Documents & Links
-- Latest session log: `logs/20261028-035453-claude.md`
+- Latest session log: `logs/20261028-225056-antigravity.md`

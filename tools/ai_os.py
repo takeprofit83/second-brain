@@ -124,6 +124,44 @@ def cmd_status(args):
         print("-" * 70)
 
 
+WIKILINK_RE = re.compile(r"\[\[([^\]|#]+)(?:#[^\]|]*)?(?:\|[^\]]*)?\]\]")
+
+
+def resolve_wikilinks(body_text: str, skip_path: Path, max_links: int = 8) -> list:
+    """Find [[wikilinks]] in a note body and resolve each to a short preview
+    of the target note (first heading or first non-empty line). Obsidian's
+    own graph view only renders these links for a human browsing the vault —
+    no AI-OS tool ever followed them, even though cmd_resume's own output
+    told agents to "rely on linked concepts". This closes that gap."""
+    seen = set()
+    results = []
+    for m in WIKILINK_RE.finditer(body_text or ""):
+        target = m.group(1).strip()
+        if not target or target in seen:
+            continue
+        seen.add(target)
+        if len(results) >= max_links:
+            break
+        candidate = (REPO_ROOT / target).with_suffix(".md")
+        if not candidate.exists() or candidate.resolve() == skip_path.resolve():
+            continue
+        try:
+            text = candidate.read_text(encoding="utf-8")
+        except Exception:
+            continue
+        if text.startswith("---"):
+            parts = text.split("---", 2)
+            text = parts[2].strip() if len(parts) >= 3 else text
+        preview = ""
+        for line in text.splitlines():
+            line = line.strip()
+            if line:
+                preview = line.lstrip("#").strip()
+                break
+        results.append((target, preview[:140]))
+    return results
+
+
 def cmd_resume(args):
     """Pull remote updates and display the execution context for a project."""
     project_key = args.project.lower().strip()
@@ -175,6 +213,12 @@ def cmd_resume(args):
     print("CURRENT STATE & OBJECTIVE:")
     print(info.get("body", info.get("content", "")))
     print("-" * 80)
+    linked_notes = resolve_wikilinks(info.get("body", ""), state_file)
+    if linked_notes:
+        print("LINKED NOTES (from [[wikilinks]] above, resolved automatically):")
+        for target, preview in linked_notes:
+            print(f"- [[{target}]] — {preview}" if preview else f"- [[{target}]]")
+        print("-" * 80)
     if latest_log_snippet:
         print("PREVIOUS SESSION HIGHLIGHTS (from latest log):")
         print(latest_log_snippet)

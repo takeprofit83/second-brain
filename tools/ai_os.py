@@ -292,10 +292,25 @@ active_blockers: "{ (args.blockers or 'None').replace('"', "'") }"
         ok_commit, out_c, err_c = run_git(["commit", "-m", commit_msg])
         if ok_commit:
             ok_push, out_p, err_p = run_git(["push", "origin", "main"])
-            if ok_push:
-                print(f"[AI-OS SUCCESS] Session synced to GitHub main ({commit_msg})")
+            if not ok_push:
+                # Другой агент (Antigravity/Cursor/другая сессия Claude) мог запушить между нашим
+                # pull'ом на старте и этим push — обычный race при нескольких одновременных
+                # писателей в один git-репозиторий. Раньше здесь был только WARNING без повтора,
+                # коммит оставался застрявшим неотправленным, и следующий resume() другого
+                # агента его не видел — то самое "данные между моделями не синхронизируются".
+                # Чиним: подтягиваем remote (-X ours разрешает конфликт в НАШУ пользу — этот save
+                # заведомо новее по времени и должен победить, как и задумано в cmd_resume/status),
+                # затем повторяем push один раз.
+                print("[AI-OS] Push rejected — remote has new commits, merging (ours) and retrying...", file=sys.stderr)
+                ok_pull, out_pull, err_pull = run_git(["pull", "--no-edit", "-X", "ours", "origin", "main"])
+                if ok_pull:
+                    ok_push, out_p, err_p = run_git(["push", "origin", "main"])
+                if not ok_push:
+                    print(f"[AI-OS WARNING] Git push still failed after merge retry: {err_p or err_pull}")
+                else:
+                    print(f"[AI-OS SUCCESS] Session synced to GitHub main after merge retry ({commit_msg})")
             else:
-                print(f"[AI-OS WARNING] Git push failed: {err_p}")
+                print(f"[AI-OS SUCCESS] Session synced to GitHub main ({commit_msg})")
         else:
             print(f"[AI-OS WARNING] Git commit skipped or failed: {err_c}")
 

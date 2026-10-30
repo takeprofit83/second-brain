@@ -23,7 +23,7 @@ active_blockers: "None"
   - **Сквозная ревизия 24 модулей:** Устранено 17 багов безопасности и надежности (верификация ЮKassa, idempotency, потеря текстов, таймауты LLM).
   - **Архитектура публикаций:** Реализован `reassignOverdueDraft()` в `publication-scheduler.ts` и `dismissKnownOverlays()` в `getDzenPublicationState`.
   - **Боевой деплой на `nikita-vm`:** Задеплоен релиз `4bc1ea9`, работает через PM2 без лимитов памяти.
-  - **Финальные инсайты сессий Claude:** Все 4 активные сессии Claude Code за 28–29 октября полностью извлечены из локального кэша и сохранены в чистом Markdown: [[Projects/Dzen/logs/claude_recovered_sessions/INDEX|Архив сессий Claude (4 файла, ~2.6 МБ)]].
+  - **Финальные инсайты сессий Claude:** Все 4 активные сессии Claude Code за 28–29 октября полностью извлечены из локального кэша и сохранены в чистом Markdown: [[Projects/Dzen/logs/20261029-033000-claude-recovered|Последний лог сессии (20261029-033000-claude-recovered)]].
 - **Active Blockers:** None
 
 ## Next Steps (Autonomous Queue)
@@ -33,6 +33,6 @@ active_blockers: "None"
 
 ## Reference Documents & Links
 - Главный пульт: [[Dashboard|Second Brain Dashboard]]
-- Полный архив сессий Claude (28–29 окт): [[Projects/Dzen/logs/claude_recovered_sessions/INDEX|Сырые диалоги всех 4 сессий (Markdown)]]
-- Восстановленный лог сессии: [[Projects/Dzen/logs/20261029-033000-claude-recovered|Лог ключевых выводов Claude]]
+- Полный архив сессий Claude (28–29 окт): [[Projects/Dzen/logs/20261029-033000-claude-recovered|Последний лог сессии (20261029-033000-claude-recovered)]]
+- Восстановленный лог сессии: [[Projects/Dzen/logs/20261029-033000-claude-recovered|Последний лог сессии (20261029-033000-claude-recovered)]]
 - Предыдущий лог деплоя: `logs/20261028-034926-claude.md`

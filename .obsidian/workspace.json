@@ -4,11 +4,11 @@
     "type": "split",
     "children": [
       {
-        "id": "5a50c92f71ead8a3",
+        "id": "7c2623555cfee2c8",
         "type": "tabs",
         "children": [
           {
-            "id": "1d012d2e67722bf4",
+            "id": "5286c9e4eff0f32d",
             "type": "leaf",
             "state": {
               "type": "graph",
@@ -181,7 +181,7 @@
       "bases:Создать новую базу": false
     }
   },
-  "active": "1d012d2e67722bf4",
+  "active": "5286c9e4eff0f32d",
   "lastOpenFiles": [
     "Projects/Atlas/openrouter.md",
     "openrouter.canvas",

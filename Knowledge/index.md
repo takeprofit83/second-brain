@@ -10,3 +10,5 @@
 - [[monetization-audit-directions]] (auto-added by lint, no description yet)
 - [[claude_sessions_archive_catalog]] (auto-added by lint, no description yet)
 - [[monetization-audit-directions]] (auto-added by lint, no description yet)
+- [[claude_sessions_archive_catalog]] (auto-added by lint, no description yet)
+- [[monetization-audit-directions]] (auto-added by lint, no description yet)

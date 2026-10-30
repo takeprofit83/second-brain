@@ -53,6 +53,13 @@ def log(msg: str):
 
 
 def run_cmd(cmd, cwd=None, timeout=30):
+    kwargs = {}
+    if sys.platform == "win32":
+        startupinfo = subprocess.STARTUPINFO()
+        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        startupinfo.wShowWindow = subprocess.SW_HIDE
+        kwargs["startupinfo"] = startupinfo
+        kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
     try:
         res = subprocess.run(
             cmd,
@@ -61,7 +68,8 @@ def run_cmd(cmd, cwd=None, timeout=30):
             text=True,
             timeout=timeout,
             encoding="utf-8",
-            errors="replace"
+            errors="replace",
+            **kwargs
         )
         return res.returncode == 0, res.stdout.strip(), res.stderr.strip()
     except Exception as e:
@@ -100,11 +108,16 @@ def maintain_link_map():
                 content = re.sub(r'last_log:\s*["\']?([^"\']+)["\']?', f'last_log: "{latest_log.name}"', content)
             
             # Update wikilink to latest log in Reference Documents
-            # Matches [[Projects/.../logs/...]] or [[...log...]]
-            log_link_pattern = r'\[\[(Projects/' + name.capitalize() + r'/logs/[^\]|]+)(\|[^\]]+)?\]\]'
+            # Matches [[Projects/.../logs/...]] or [[Courses/logs/...]]
+            proj_folder = "Courses" if name == "courses" else f"Projects/{name.capitalize()}"
+            log_link_pattern = r'\[\[(' + re.escape(proj_folder) + r'/logs/[^\]|]+)(\|[^\]]+)?\]\]'
             new_wikilink = f"[[{latest_log_rel.replace('.md', '')}|Последний лог сессии ({latest_log_stem})]]"
             if re.search(log_link_pattern, content):
                 content = re.sub(log_link_pattern, new_wikilink, content)
+            else:
+                log_line_pat = r'(-\s*(?:Последний лог сессии|Latest session log|Последний лог):?\s*)(?:\[\[[^\]]+\]\]|`[^`]+`|[^\n]+)'
+                if re.search(log_line_pat, content):
+                    content = re.sub(log_line_pat, rf'- Последний лог сессии: {new_wikilink}', content, count=1)
             
             if content != original_content:
                 state_file.write_text(content, encoding="utf-8")
@@ -162,8 +175,8 @@ def sync_second_brain():
 
     # Commit any uncommitted safe changes
     if has_uncommitted:
-        log("Uncommitted changes detected in second-brain. Staging and committing...")
-        run_cmd(["git", "add", "-A"], cwd=REPO_ROOT)
+        log("Uncommitted changes detected in second-brain. Staging safe paths and committing...")
+        run_cmd(["git", "add", "Projects", "Courses", "Knowledge", "docs", "Dashboard.md"], cwd=REPO_ROOT)
         ts = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
         commit_msg = f"chore(auto-sync): background synchronization & link map update [{ts}]"
         ok_c, _, err_c = run_cmd(["git", "commit", "-m", commit_msg], cwd=REPO_ROOT)

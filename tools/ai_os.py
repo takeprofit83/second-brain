@@ -46,8 +46,15 @@ PROJECT_MAP = {
 
 
 def run_git(args, cwd=REPO_ROOT):
-    """Run a git command in the repository."""
+    """Run a git command in the repository with hidden console on Windows."""
     cmd = ["git"] + args
+    kwargs = {}
+    if sys.platform == "win32":
+        startupinfo = subprocess.STARTUPINFO()
+        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        startupinfo.wShowWindow = subprocess.SW_HIDE
+        kwargs["startupinfo"] = startupinfo
+        kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
     try:
         res = subprocess.run(
             cmd,
@@ -55,7 +62,8 @@ def run_git(args, cwd=REPO_ROOT):
             capture_output=True,
             text=True,
             check=False,
-            encoding="utf-8"
+            encoding="utf-8",
+            **kwargs
         )
         return res.returncode == 0, res.stdout.strip(), res.stderr.strip()
     except Exception as e:
@@ -237,6 +245,134 @@ def cmd_resume(args):
     print("=" * 80)
 
 
+def update_project_state_content(existing_text: str, project_key: str, agent: str, summary: str, next_steps: str, blockers: str, log_filename: str, ts_iso: str) -> str:
+    """Updates project_state.md without destroying existing wikilinks, custom sections, or notes."""
+    clean_next = (next_steps or "").strip()
+    clean_blockers = (blockers or "None").strip()
+    clean_summary = (summary or "").strip()
+    log_stem = log_filename.replace('.md', '') if log_filename else ""
+    proj_folder = "Courses" if project_key.lower() == "courses" else f"Projects/{project_key.capitalize()}"
+    new_log_link = f"[[{proj_folder}/logs/{log_stem}|Последний лог сессии ({log_stem})]]" if log_filename else "None"
+    
+    if not existing_text.strip():
+        return f"""---
+type: memory
+tier: 1
+ai_read: true
+tags:
+  - memory
+  - moc
+  - core
+project: "{project_key}"
+status: "active"
+updated_at: "{ts_iso}"
+last_agent: "{agent}"
+last_log: "{log_filename or ''}"
+next_steps: "{clean_next.replace('"', "'")}"
+active_blockers: "{clean_blockers.replace('"', "'")}"
+---
+
+# Project State: {project_key.capitalize()}
+
+## Current Objective & Status
+- **Last Updated:** {ts_iso} by `{agent}`
+- **Recent Progress:** {clean_summary}
+- **Active Blockers:** {clean_blockers}
+
+## Next Steps (Autonomous Queue)
+- {clean_next}
+
+## Reference Documents & Links
+- Главный пульт: [[Dashboard|Second Brain & AI-OS Dashboard]]
+- Реестр архитектурных решений: [[docs/DECISIONS|Архитектурные решения ADR]]
+- Каталог базы знаний: [[Knowledge/index|Оглавление Wiki]]
+- Последний лог сессии: {new_log_link}
+"""
+
+    if existing_text.startswith("---"):
+        parts = existing_text.split("---", 2)
+        if len(parts) >= 3:
+            fm_text = parts[1]
+            body = parts[2]
+            
+            def set_yaml_key(fm: str, key: str, val: str) -> str:
+                val_escaped = val.replace('"', '\\"')
+                pattern = rf'^{key}\s*:.*$'
+                replacement = f'{key}: "{val_escaped}"'
+                if re.search(pattern, fm, flags=re.MULTILINE):
+                    return re.sub(pattern, replacement, fm, flags=re.MULTILINE)
+                else:
+                    return fm.rstrip("\n") + f'\n{replacement}\n'
+
+            fm_text = set_yaml_key(fm_text, "updated_at", ts_iso)
+            fm_text = set_yaml_key(fm_text, "last_agent", agent)
+            if log_filename:
+                fm_text = set_yaml_key(fm_text, "last_log", log_filename)
+            fm_text = set_yaml_key(fm_text, "next_steps", clean_next)
+            fm_text = set_yaml_key(fm_text, "active_blockers", clean_blockers)
+            
+            # Update body while strictly preserving all other sections and links
+            if re.search(r'(-\s*\*\*Last Updated:\*\*).*', body):
+                body = re.sub(
+                    r'(-\s*\*\*Last Updated:\*\*).*',
+                    rf'- **Last Updated:** {ts_iso} by `{agent}`',
+                    body,
+                    count=1
+                )
+            
+            if re.search(r'(-\s*\*\*Active Blockers:\*\*).*', body):
+                body = re.sub(
+                    r'(-\s*\*\*Active Blockers:\*\*).*',
+                    rf'- **Active Blockers:** {clean_blockers}',
+                    body,
+                    count=1
+                )
+            
+            progress_pattern = r'(-\s*\*\*Recent Progress:\*\*).*?(?=(\n-\s*\*\*|\n## |\Z))'
+            if "\n" in clean_summary:
+                formatted_summary = "- **Recent Progress:**\n" + "\n".join("  " + l if not l.startswith("  ") else l for l in clean_summary.splitlines())
+            else:
+                formatted_summary = f"- **Recent Progress:** {clean_summary}"
+            
+            if re.search(progress_pattern, body, flags=re.DOTALL):
+                body = re.sub(progress_pattern, formatted_summary, body, count=1, flags=re.DOTALL)
+                
+            next_steps_pattern = r'(##\s*(?:Next Steps|Следующий шаг)[^\n]*\n).*?(?=(\n## |\Z))'
+            if re.search(next_steps_pattern, body, flags=re.DOTALL):
+                body = re.sub(next_steps_pattern, rf'\1- {clean_next}\n\n', body, count=1, flags=re.DOTALL)
+            
+            if log_filename:
+                log_line_pattern = r'(-\s*(?:Последний лог сессии|Latest session log|Последний лог):?\s*)(?:\[\[[^\]]+\]\]|`[^`]+`|[^\n]+)'
+                if re.search(log_line_pattern, body):
+                    body = re.sub(log_line_pattern, rf'- Последний лог сессии: {new_log_link}', body, count=1)
+                elif "## Reference Documents & Links" in body:
+                    body = body.replace("## Reference Documents & Links", f"## Reference Documents & Links\n- Последний лог сессии: {new_log_link}")
+                elif "## Референсы и ссылки" in body:
+                    body = body.replace("## Референсы и ссылки", f"## Референсы и ссылки\n- Последний лог сессии: {new_log_link}")
+
+            return f"---{fm_text}---{body}"
+
+    return f"""---
+type: memory
+tier: 1
+ai_read: true
+tags:
+  - memory
+  - moc
+  - core
+project: "{project_key}"
+status: "active"
+updated_at: "{ts_iso}"
+last_agent: "{agent}"
+last_log: "{log_filename or ''}"
+next_steps: "{clean_next.replace('"', "'")}"
+active_blockers: "{clean_blockers.replace('"', "'")}"
+---
+
+{existing_text.strip()}
+"""
+
+
 def cmd_save(args):
     """Save session log, update project state, and commit & push to Git."""
     project_key = args.project.lower().strip()
@@ -291,41 +427,19 @@ status: "completed"
     log_path.write_text(log_content, encoding="utf-8")
     print(f"[AI-OS] Created session log: {log_path.relative_to(REPO_ROOT)}")
 
-    # 2. Update project_state.md (Tier 1: Core Shared Memory / MOC)
+    # 2. Update project_state.md (Tier 1: Core Shared Memory / MOC - preserving links & graph)
     existing_content = state_file.read_text(encoding="utf-8") if state_file.exists() else ""
-    
-    # Update frontmatter or create new
-    new_state = f"""---
-type: memory
-tier: 1
-ai_read: true
-tags:
-  - memory
-  - moc
-  - core
-project: "{project_key}"
-status: "active"
-updated_at: "{ts_iso}"
-last_agent: "{agent}"
-last_log: "{log_filename}"
-next_steps: "{args.next.replace('"', "'")}"
-active_blockers: "{ (args.blockers or 'None').replace('"', "'") }"
----
-
-# Project State: {project_key.capitalize()}
-
-## Current Objective & Status
-- **Last Updated:** {ts_iso} by `{agent}`
-- **Recent Progress:** {args.summary}
-- **Active Blockers:** {args.blockers or 'None'}
-
-## Next Steps (Autonomous Queue)
-- {args.next}
-
-## Reference Documents & Links
-- Latest session log: `logs/{log_filename}`
-"""
-    state_file.write_text(new_state, encoding="utf-8")
+    updated_state = update_project_state_content(
+        existing_text=existing_content,
+        project_key=project_key,
+        agent=agent,
+        summary=args.summary,
+        next_steps=args.next,
+        blockers=args.blockers,
+        log_filename=log_filename,
+        ts_iso=ts_iso
+    )
+    state_file.write_text(updated_state, encoding="utf-8")
     print(f"[AI-OS] Updated project state: {state_file.relative_to(REPO_ROOT)}")
 
     # 3. Git commit & push

@@ -39,6 +39,17 @@ PROJECT_MAP = {
 }
 
 
+def get_subprocess_kwargs():
+    kwargs = {}
+    if sys.platform == "win32":
+        startupinfo = subprocess.STARTUPINFO()
+        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        startupinfo.wShowWindow = subprocess.SW_HIDE
+        kwargs["startupinfo"] = startupinfo
+        kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
+    return kwargs
+
+
 def log_err(msg: str):
     print(f"[AI-OS MCP] {msg}", file=sys.stderr, flush=True)
 
@@ -80,7 +91,8 @@ def tool_resume_context(project: str = "atlas") -> str:
             capture_output=True,
             timeout=10,
             text=True,
-            encoding="utf-8"
+            encoding="utf-8",
+            **get_subprocess_kwargs()
         )
     except Exception as e:
         log_err(f"git pull warning: {e}")
@@ -143,7 +155,8 @@ def tool_save_session(project: str, summary: str, next_step: str, agent: str = "
             capture_output=True,
             text=True,
             encoding="utf-8",
-            timeout=30
+            timeout=30,
+            **get_subprocess_kwargs()
         )
         if res.returncode == 0:
             return f"Session successfully saved and pushed to Git:\n{res.stdout}"

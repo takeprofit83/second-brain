@@ -6,15 +6,9 @@ Runs silently in the background on Windows (via Windows Task Scheduler + pythonw
 Does NOT require terminal or user intervention.
 
 Functions:
-1. Detects active projects and checks git status across:
-   - D:\YandexDisk\Atlas\second-brain
-   - D:\YandexDisk\Content fabric\Dzen
-   - D:\YandexDisk\Dacha
-   - D:\YandexDisk\NastyaProject
-   - D:\YandexDisk\Gamebot\kis-project
+1. Always pulls latest changes from GitHub (e.g. n8n daily cron commits).
 2. Automatically commits and pushes safe changes in second-brain to GitHub (takeprofit83/second-brain).
 3. Detects recent local Claude Code / Antigravity sessions and ensures active project_state.md is never stale.
-4. Auto-resolves merge conflicts (ours wins) so git never hangs.
 """
 
 import os
@@ -70,20 +64,24 @@ def run_cmd(cmd, cwd=None, timeout=30):
 
 def sync_second_brain():
     """Ensure second-brain repo is pulled, committed, and pushed."""
-    # 1. Check status
+    # 1. First always pull remote changes (from n8n / other devices)
+    ok_pull, _, err_pull = run_cmd(["git", "pull", "origin", "main", "--no-rebase"], cwd=REPO_ROOT)
+    if not ok_pull:
+        log(f"Git pull warning: {err_pull}")
+
+    # 2. Check status
     ok, status_out, _ = run_cmd(["git", "status", "--porcelain"], cwd=REPO_ROOT)
     if not ok:
         log(f"Git status failed in second-brain: {status_out}")
         return
 
-    # 2. Check unpushed commits
+    # Check unpushed commits
     ok_ahead, ahead_out, _ = run_cmd(["git", "status", "-sb"], cwd=REPO_ROOT)
     has_unpushed = ok_ahead and "ahead" in ahead_out
     has_uncommitted = bool(status_out.strip())
 
     if not has_uncommitted and not has_unpushed:
-        # Clean, try silent pull with rebase
-        run_cmd(["git", "pull", "--rebase", "origin", "main"], cwd=REPO_ROOT)
+        log("Second-brain is clean and up to date.")
         return
 
     # Commit any uncommitted safe changes
@@ -100,8 +98,8 @@ def sync_second_brain():
     log("Pushing second-brain updates to GitHub...")
     ok_push, _, err_push = run_cmd(["git", "push", "origin", "main"], cwd=REPO_ROOT)
     if not ok_push:
-        log(f"Push rejected: {err_push}. Attempting pull --rebase -X ours and retry...")
-        run_cmd(["git", "pull", "--rebase", "-X", "ours", "origin", "main"], cwd=REPO_ROOT)
+        log(f"Push rejected: {err_push}. Trying pull and retry push...")
+        run_cmd(["git", "pull", "origin", "main", "--no-rebase"], cwd=REPO_ROOT)
         ok_retry, _, err_retry = run_cmd(["git", "push", "origin", "main"], cwd=REPO_ROOT)
         if ok_retry:
             log("Retry push succeeded.")
@@ -125,7 +123,6 @@ def check_claude_recent_sessions():
     if not recent:
         return
 
-    # If recent sessions found, ensure Dzen and Atlas state notes reflect recent activity
     for f in recent:
         fname = os.path.basename(f)
         parent_name = os.path.basename(os.path.dirname(f)).lower()
@@ -145,12 +142,9 @@ def check_claude_recent_sessions():
         state_file = PROJECT_MAP.get(target_project, PROJECTS_DIR / target_project) / "project_state.md"
         if state_file.exists():
             try:
-                content = state_file.read_text(encoding="utf-8")
-                # Update timestamp if older than session file
                 mtime = os.path.getmtime(f)
                 dt_iso = datetime.datetime.fromtimestamp(mtime).strftime("%Y-%m-%dT%H:%M:%SZ")
-                # Touch state file safely if needed
-                log(f"Active session found for project '{target_project}': {fname} ({dt_iso})")
+                log(f"Active session verified for project '{target_project}': {fname} ({dt_iso})")
             except Exception as e:
                 log(f"Error checking state file for {target_project}: {e}")
 

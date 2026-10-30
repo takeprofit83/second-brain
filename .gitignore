@@ -11,3 +11,6 @@ secrets/
 # OS / Editor temporary files
 .DS_Store
 Thumbs.db
+
+# Watchdog local runtime logs
+tools/watchdog.log

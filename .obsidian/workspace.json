@@ -11,10 +11,10 @@
             "id": "1d012d2e67722bf4",
             "type": "leaf",
             "state": {
-              "type": "empty",
+              "type": "graph",
               "state": {},
-              "icon": "lucide-file",
-              "title": "Новая вкладка"
+              "icon": "lucide-git-fork",
+              "title": "Граф"
             }
           }
         ]
@@ -181,7 +181,7 @@
       "bases:Создать новую базу": false
     }
   },
-  "active": "254caebee43afcbc",
+  "active": "1d012d2e67722bf4",
   "lastOpenFiles": [
     "Projects/Atlas/openrouter.md",
     "openrouter.canvas",

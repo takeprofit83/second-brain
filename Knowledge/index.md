@@ -18,3 +18,5 @@
 - Реестр архитектурных решений: [[docs/DECISIONS|Архитектурные решения (ADR-001 ... ADR-018)]]
 - [[claude_sessions_archive_catalog]] (auto-added by lint, no description yet)
 - [[monetization-audit-directions]] (auto-added by lint, no description yet)
+- [[claude_sessions_archive_catalog]] (auto-added by lint, no description yet)
+- [[monetization-audit-directions]] (auto-added by lint, no description yet)

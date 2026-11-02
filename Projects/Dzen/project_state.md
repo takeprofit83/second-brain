@@ -2,37 +2,32 @@
 type: memory
 tier: 1
 ai_read: true
-tags:
-  - memory
-  - moc
-  - core
-project: "dzen"
-status: "active"
-updated_at: "2026-10-29T03:39:00.000Z"
+project: dzen
+status: active
 last_agent: "antigravity"
-last_log: "20261029-033000-claude-recovered.md"
-next_steps: "1. Вынести создание первого канала во вступительный пошаговый клиентский бриф (устранить зависимость от admin-only страницы /browser-profiles). 2. Скорректировать системный промпт конвейера для канала «Ламповые истории» (убрать шаблонные даты и возраст в зачинах). 3. Деплой — ТОЛЬКО через git push + git archive HEAD | ssh nikita-vm deploy.sh."
+last_log: "20261102-160551-antigravity-8d2316e428d84185b1ff4b50f423b066.md"
+next_steps: "Monitor stella auto-schedule and author balance"
+updated_at: "2026-11-02T16:05:51.603481Z"
 active_blockers: "None"
 ---
 
-# Project State: Dzen-Studio (Дзен Автор)
+# Дзен Автор — актуальный handoff 2026-11-02
 
-## Current Objective & Status
-- **Last Updated:** 2026-10-29T03:39:00Z by `antigravity` (восстановление и архивация сессий Claude)
-- **Recent Progress:**
-  - **Сквозная ревизия 24 модулей:** Устранено 17 багов безопасности и надежности (верификация ЮKassa, idempotency, потеря текстов, таймауты LLM).
-  - **Архитектура публикаций:** Реализован `reassignOverdueDraft()` в `publication-scheduler.ts` и `dismissKnownOverlays()` в `getDzenPublicationState`.
-  - **Боевой деплой на `nikita-vm`:** Задеплоен релиз `4bc1ea9`, работает через PM2 без лимитов памяти.
-  - **Финальные инсайты сессий Claude:** Все 4 активные сессии Claude Code за 28–29 октября полностью извлечены из локального кэша и сохранены в чистом Markdown: [[Projects/Dzen/logs/20261029-033000-claude-recovered|Последний лог сессии (20261029-033000-claude-recovered)]].
-- **Active Blockers:** None
+Код D:\YandexDisk\Content fabric\Dzen. Читать AGENTS.md, верх CURRENT_STATE.md и PROJECT_GUIDE.md §0.
 
-## Next Steps (Autonomous Queue)
-- **Шаг 1:** Автоматический онбординг: перенести создание первого канала в клиентский вступительный бриф (сейчас `POST /api/channels/create-with-profile` доступен только админу).
-- **Шаг 2:** Конвейер «Ламповые истории»: скорректировать промпт генерации рассказов, убрав шаблонные даты («такого-то числа...») и искусственное упоминание возраста героев.
-- **Шаг 3:** Реализация плана продвижения для привлечения первых тестовых авторов.
+## Проверенный выкат: Селектор аккаунтов для начисления стелл и бонусы клиентам — 2026-11-02
 
-## Reference Documents & Links
-- Главный пульт: [[Dashboard|Second Brain Dashboard]]
-- Полный архив сессий Claude (28–29 окт): [[Projects/Dzen/logs/20261029-033000-claude-recovered|Последний лог сессии (20261029-033000-claude-recovered)]]
-- Восстановленный лог сессии: [[Projects/Dzen/logs/20261029-033000-claude-recovered|Последний лог сессии (20261029-033000-claude-recovered)]]
-- Предыдущий лог деплоя: `logs/20261028-034926-claude.md`
+Код **44e0012**, BUILD_ID **8EJUVJ_6xQXE3u1_7mTpt**, deploy.sh exit0.
+1) **Прямой выбор аккаунта в модалке «+ Начислить аккаунту» (`StellaBoard.tsx`):** Администратор может начислить стеллы любому клиенту платформы прямо со страницы Стелл без входа под его профилем (Impersonation). В модалке отображается селектор клиентов со списком их каналов и текущим балансом.
+2) **API `/api/admin/stellas/accounts`:** Реализован защищенный эндпоинт для админа: GET отдает аккаунты с их балансами и каналами; POST зачисляет стеллы на выбранный `tenantId` под системным обходом RLS (`runWithBypass`).
+3) **Бонусное начисление стелл в «Пользователи» (`AdminUsersBoard.tsx`):** В модальном окне «Тариф и баланс» добавлена вкладка **«★ Стеллы»** с быстрыми кнопками (+5, +10, +20, +50, +100 ★), полем комментария и мгновенным начислением бонуса клиенту.
+4) **Автомиграция остатков в `stella-pool.ts`:** При начислении или чтении по `tenantId` автоматически мигрируются любые исторические остатки с каналов этого тенанта.
+5) **Проверки:** 387/387 unit-тестов pass, TypeScript pass (`npx tsc --noEmit` exit 0). После деплоя: `/login` 200, `/stellas` 307, фоновые воркеры онлайн, новых строк в error-log 0. Схема БД не менялась.
+
+## Уже выкачено
+
+9a879e7 atomic credit; 851b3ef checkout reserve/recovery/resume; 51b2b98 safe setExact; 0607df0 убирает агрегатный cache; 0016bcd tenantId и RLS для StellaPlacementOperation в PG; c03abc2 устранение крашей Playwright в Linux (--disable-dev-shm-usage, --disable-gpu); a4e5614 горячие сессии стелл и CDP Screencast; 51026de мгновенное чтение баланса через JSON API; 5522ac4 единый баланс на аккаунт (tenantId) и CAS-защита; 8b94532 обновление UI админского начисления на аккаунт; 44e0012 селектор аккаунтов и бонусное начисление стелл.
+
+## Ограничения и режим
+
+«Ламповые истории» cmtrv0vg40003ld9rxv3lpxid: строго защищен — не менять ToV/промпты/стиль, не делать тестовые генерации или сбросы. UI-функции сохранять (обратная совместимость 100%). Локальная .next запрещена; сборка/выкат только серверным deploy.sh на nikita-vm.

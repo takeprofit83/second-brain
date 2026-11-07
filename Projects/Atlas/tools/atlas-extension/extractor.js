@@ -1,4 +1,4 @@
-(async function() {
+(function() {
   const host = location.hostname.toLowerCase();
   let platform = 'unknown';
   let chatId = 'chat_' + Date.now();
@@ -10,60 +10,21 @@
     const m = location.pathname.match(/\/c\/([a-f0-9-]+)/i);
     if (m) chatId = m[1];
 
-    try {
-      const sessRes = await fetch('/api/auth/session', { credentials: 'include' });
-      if (sessRes.ok) {
-        const sess = await sessRes.json();
-        if (sess && sess.accessToken && m) {
-          const convRes = await fetch('/backend-api/conversation/' + m[1], {
-            credentials: 'include',
-            headers: { 'Authorization': 'Bearer ' + sess.accessToken }
-          });
-          if (convRes.ok) {
-            const conv = await convRes.json();
-            const mapping = conv.mapping || {};
-            let curr = conv.current_node;
-            const chain = [];
-            while (curr) {
-              const node = mapping[curr];
-              if (!node) break;
-              chain.unshift(node);
-              curr = node.parent;
-            }
-            const lines = [];
-            for (const node of chain) {
-              const msg = node.message;
-              if (!msg || !msg.content) continue;
-              const role = msg.author && msg.author.role;
-              if (role !== 'user' && role !== 'assistant') continue;
-              const parts = msg.content.parts || [];
-              const t = parts.map(p => typeof p === 'string' ? p : (p.text || '')).join('\n').trim();
-              if (t) lines.push((role === 'user' ? 'Пользователь: ' : 'Ассистент: ') + t);
-            }
-            if (lines.length > 0) text = lines.join('\n\n');
-          }
-        }
+    const articles = document.querySelectorAll('article, [data-message-author-role], div[data-message-id]');
+    const lines = [];
+    const seen = new Set();
+    for (const art of articles) {
+      if (art.parentElement && art.parentElement.closest('article, [data-message-author-role]')) continue;
+      const roleAttr = art.getAttribute('data-message-author-role');
+      const isUser = roleAttr === 'user' || art.querySelector('[data-message-author-role="user"]') || art.innerText.includes('You said:') || art.innerText.includes('Вы сказали:');
+      const contentEl = art.querySelector('.markdown') || art.querySelector('div.whitespace-pre-wrap') || art;
+      const t = contentEl ? contentEl.innerText.trim() : '';
+      if (t && !seen.has(t)) {
+        seen.add(t);
+        lines.push((isUser ? 'Пользователь: ' : 'Ассистент: ') + t);
       }
-    } catch(e) {}
-
-    // Fallback DOM for ChatGPT
-    if (!text) {
-      const articles = document.querySelectorAll('article, [data-message-author-role], div[data-message-id]');
-      const lines = [];
-      const seen = new Set();
-      for (const art of articles) {
-        if (art.parentElement && art.parentElement.closest('article, [data-message-author-role]')) continue;
-        const roleAttr = art.getAttribute('data-message-author-role');
-        const isUser = roleAttr === 'user' || art.querySelector('[data-message-author-role="user"]') || art.innerText.includes('You said:') || art.innerText.includes('Вы сказали:');
-        const contentEl = art.querySelector('.markdown') || art.querySelector('div.whitespace-pre-wrap') || art;
-        const t = contentEl ? contentEl.innerText.trim() : '';
-        if (t && !seen.has(t)) {
-          seen.add(t);
-          lines.push((isUser ? 'Пользователь: ' : 'Ассистент: ') + t);
-        }
-      }
-      if (lines.length > 0) text = lines.join('\n\n');
     }
+    if (lines.length > 0) text = lines.join('\n\n');
   }
 
   // 2. DeepSeek
@@ -72,42 +33,18 @@
     const m = location.pathname.match(/\/a\/chat\/s\/([a-f0-9-]+)/i);
     if (m) chatId = m[1];
 
-    try {
-      const rawTok = localStorage.getItem('userToken');
-      if (rawTok && m) {
-        const parsed = JSON.parse(rawTok);
-        if (parsed.value) {
-          const res = await fetch(`https://chat.deepseek.com/api/v0/chat/history_messages?chat_session_id=${m[1]}`, {
-            credentials: 'include',
-            headers: { authorization: `Bearer ${parsed.value}` }
-          });
-          if (res.ok) {
-            const data = await res.json();
-            const msgs = (data && data.data && data.data.biz_data && data.data.biz_data.chat_messages) || [];
-            const lines = msgs
-              .filter(m => m.role === 'USER' || m.role === 'ASSISTANT')
-              .map(m => (m.role === 'USER' ? 'Пользователь: ' : 'Ассистент: ') + (m.content || '').trim())
-              .filter(l => l.length > 15);
-            if (lines.length > 0) text = lines.join('\n\n');
-          }
-        }
+    const nodes = document.querySelectorAll('.ds-markdown, [class*="chat-message"], div[class*="chat-content"], div[class*="userMessage"], div[class*="assistantMessage"]');
+    const lines = [];
+    const seen = new Set();
+    for (const n of nodes) {
+      const isUser = n.closest('[class*="user"]') !== null || /user/i.test(n.className);
+      const t = n.innerText.trim();
+      if (t && !seen.has(t)) {
+        seen.add(t);
+        lines.push((isUser ? 'Пользователь: ' : 'Ассистент: ') + t);
       }
-    } catch(e) {}
-
-    if (!text) {
-      const nodes = document.querySelectorAll('.ds-markdown, [class*="chat-message"], div[class*="chat-content"], div[class*="userMessage"], div[class*="assistantMessage"]');
-      const lines = [];
-      const seen = new Set();
-      for (const n of nodes) {
-        const isUser = n.closest('[class*="user"]') !== null || /user/i.test(n.className);
-        const t = n.innerText.trim();
-        if (t && !seen.has(t)) {
-          seen.add(t);
-          lines.push((isUser ? 'Пользователь: ' : 'Ассистент: ') + t);
-        }
-      }
-      if (lines.length > 0) text = lines.join('\n\n');
     }
+    if (lines.length > 0) text = lines.join('\n\n');
   }
 
   // 3. Claude
@@ -169,42 +106,18 @@
     const m = location.pathname.match(/\/c\/([a-f0-9-]+)/i);
     if (m) chatId = m[1];
 
-    try {
-      if (m) {
-        const res = await fetch(`https://chat.qwen.ai/api/v2/chats/${m[1]}`, { credentials: 'include' });
-        if (res.ok) {
-          const json = await res.json();
-          const msgs = (json && json.data && json.data.chat && json.data.chat.messages) || [];
-          const lines = [];
-          for (const msg of msgs) {
-            const role = (msg.role || '').toLowerCase();
-            let content = typeof msg.content === 'string' ? msg.content : '';
-            if (!content && Array.isArray(msg.content_list)) {
-              content = msg.content_list.filter(p => p && p.phase === 'answer').map(p => p.content).join('\n');
-            }
-            if (content.trim()) {
-              lines.push((role === 'user' ? 'Пользователь: ' : 'Ассистент: ') + content.trim());
-            }
-          }
-          if (lines.length > 0) text = lines.join('\n\n');
-        }
+    const nodes = document.querySelectorAll('[class*="message-item"], [class*="chat-message"], [class*="qwen-markdown"]');
+    const lines = [];
+    const seen = new Set();
+    for (const n of nodes) {
+      const isUser = /user/i.test(n.className);
+      const txt = n.innerText.trim();
+      if (txt && !seen.has(txt)) {
+        seen.add(txt);
+        lines.push((isUser ? 'Пользователь: ' : 'Ассистент: ') + txt);
       }
-    } catch(e) {}
-
-    if (!text) {
-      const nodes = document.querySelectorAll('[class*="message-item"], [class*="chat-message"], [class*="qwen-markdown"]');
-      const lines = [];
-      const seen = new Set();
-      for (const n of nodes) {
-        const isUser = /user/i.test(n.className);
-        const txt = n.innerText.trim();
-        if (txt && !seen.has(txt)) {
-          seen.add(txt);
-          lines.push((isUser ? 'Пользователь: ' : 'Ассистент: ') + txt);
-        }
-      }
-      if (lines.length > 0) text = lines.join('\n\n');
     }
+    if (lines.length > 0) text = lines.join('\n\n');
   }
 
   // 6. Kimi (Moonshot AI / kimi.ai / kimi.moonshot.cn)
@@ -226,7 +139,6 @@
 
     if (candidateNodes.length > 0) {
       for (const node of candidateNodes) {
-        // Skip wrapper containers that contain multiple other candidate nodes
         if (node.querySelectorAll('[class*="segment"], [class*="chatItem"], [class*="chat-item"], [class*="message-item"]').length > 1) {
           continue;
         }
@@ -252,11 +164,11 @@
       }
     }
 
-    // Strategy 2: If Strategy 1 yielded nothing, find all markdown blocks (assistant answers) and text bubbles
+    // Strategy 2: Find all markdown blocks and text bubbles
     if (lines.length === 0) {
       const allBubbles = document.querySelectorAll('.markdown, [class*="markdown"], div[class*="user"], div[class*="bubble"], div[class*="message"]');
       for (const b of allBubbles) {
-        if (b.children.length > 10) continue; // skip giant parent containers
+        if (b.children.length > 10) continue;
         const t = b.innerText.trim();
         if (t && t.length > 5 && !seenTexts.has(t)) {
           seenTexts.add(t);

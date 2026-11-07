@@ -20,17 +20,25 @@
     "activeTab",
     "scripting",
     "clipboardWrite",
-    "storage"
+    "storage",
+    "tabs"
   ],
   "host_permissions": [
     "https://n8n.neiroclone.ru/*",
-    "https://chatgpt.com/*",
-    "https://claude.ai/*",
-    "https://chat.deepseek.com/*",
-    "https://gemini.google.com/*",
-    "https://chat.qwen.ai/*",
-    "https://kimi.moonshot.cn/*",
-    "https://kimi.ai/*",
-    "https://www.kimi.ai/*"
+    "*://*.chatgpt.com/*",
+    "*://chatgpt.com/*",
+    "*://*.claude.ai/*",
+    "*://claude.ai/*",
+    "*://*.deepseek.com/*",
+    "*://deepseek.com/*",
+    "*://*.google.com/*",
+    "*://*.qwen.ai/*",
+    "*://*.kimi.ai/*",
+    "*://kimi.ai/*",
+    "*://*.moonshot.cn/*",
+    "*://*.kimi.com/*",
+    "*://kimi.com/*",
+    "*://*.kimi.cn/*",
+    "*://kimi.cn/*"
   ]
 }

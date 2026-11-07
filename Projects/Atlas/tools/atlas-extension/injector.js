@@ -5,6 +5,12 @@
       || document.querySelector('rich-textarea [contenteditable="true"]')
       || document.querySelector('div.ql-editor')
       || document.querySelector('textarea#chat-input')
+      || document.querySelector('div[data-testid="msh-chat-input"]')
+      || document.querySelector('div[data-testid="chat-input"]')
+      || document.querySelector('div.chat-input-editor [contenteditable="true"]')
+      || document.querySelector('div[class*="chatInput"] [contenteditable="true"]')
+      || document.querySelector('div[class*="chat-input"] [contenteditable="true"]')
+      || document.querySelector('div[class*="inputContainer"] [contenteditable="true"]')
       || document.querySelector('div[contenteditable="true"]')
       || document.querySelector('textarea');
 

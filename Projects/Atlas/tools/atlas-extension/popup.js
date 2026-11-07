@@ -61,7 +61,7 @@
     else if (url.includes('deepseek.com')) activePlatform = 'deepseek';
     else if (url.includes('gemini.google.com')) activePlatform = 'gemini';
     else if (url.includes('qwen.ai')) activePlatform = 'qwen';
-    else if (url.includes('kimi.moonshot.cn') || url.includes('kimi.ai')) activePlatform = 'kimi';
+    else if (url.includes('kimi.moonshot.cn') || url.includes('kimi.ai') || url.includes('kimi.com')) activePlatform = 'kimi';
 
     if (activePlatform) {
       const names = {
@@ -151,6 +151,12 @@
           || document.querySelector('rich-textarea [contenteditable="true"]')
           || document.querySelector('div.ql-editor')
           || document.querySelector('textarea#chat-input')
+          || document.querySelector('div[data-testid="msh-chat-input"]')
+          || document.querySelector('div[data-testid="chat-input"]')
+          || document.querySelector('div.chat-input-editor [contenteditable="true"]')
+          || document.querySelector('div[class*="chatInput"] [contenteditable="true"]')
+          || document.querySelector('div[class*="chat-input"] [contenteditable="true"]')
+          || document.querySelector('div[class*="inputContainer"] [contenteditable="true"]')
           || document.querySelector('div[contenteditable="true"]')
           || document.querySelector('textarea');
 
@@ -192,7 +198,18 @@
       target: { tabId: activeTab.id },
       files: ['extractor.js']
     }, (results) => {
+      const err = chrome.runtime.lastError;
+      if (err) {
+        btnReadChat.textContent = '🔍 Попробовать снова';
+        captureStatus.innerHTML = `❌ Ошибка браузера: <b>${err.message}</b>.<br><small style="color:#94a3b8">Обновите страницу чата (F5) и попробуйте снова.</small>`;
+        return;
+      }
       const payload = results && results[0] && results[0].result;
+      if (payload && payload.error) {
+        btnReadChat.textContent = '🔍 Попробовать снова';
+        captureStatus.innerHTML = `❌ Ошибка парсера: <b>${payload.error}</b>`;
+        return;
+      }
       if (payload && payload.success && payload.text) {
         capturedPayload = payload;
         captureStatus.innerHTML = `✅ Прочитано: <b>${payload.charCount}</b> символов переписки.`;
@@ -200,7 +217,8 @@
         capturePicker.style.display = 'block';
       } else {
         btnReadChat.textContent = '🔍 Попробовать снова';
-        captureStatus.innerHTML = '❌ Не удалось собрать текст. Убедитесь, что сообщения загрузились на странице.';
+        const reason = payload ? `(символов: ${payload.charCount || 0}, ${payload.debug || 'пустой результат'})` : '(скрипт вернул undefined)';
+        captureStatus.innerHTML = `❌ Не удалось собрать текст ${reason}.`;
       }
     });
   });
@@ -212,7 +230,7 @@
     const label = btn.textContent.trim();
 
     capturePicker.style.display = 'none';
-    captureStatus.innerHTML = `<span class="spinner"></span> Сохраняю конспект в <b>${label}</b>…`;
+    captureStatus.innerHTML = `<span class="spinner"></span> ИИ анализирует диалог и сохраняет конспект в <b>${label}</b>…<br><div style="font-size:11px; color:#94a3b8; margin-top:8px;">⏳ Обычно занимает 15–25 сек. Дождитесь галочки перед переходом в другой чат.</div>`;
 
     fetch(N8N_CAPTURE_URL, {
       method: 'POST',
@@ -229,11 +247,15 @@
       })
     })
     .then(res => {
-      if (res.ok) {
-        captureStatus.innerHTML = `✅ Конспект успешно сохранён в проект <b>${label}</b>!<br>Диалог упакован в репозиторий.`;
-        setTimeout(() => window.close(), 2000);
+      return res.json().then(data => ({ ok: res.ok, status: res.status, data })).catch(() => ({ ok: res.ok, status: res.status, data: {} }));
+    })
+    .then(({ ok, status, data }) => {
+      if (ok && data.status !== 'error') {
+        captureStatus.innerHTML = `✅ Конспект успешно сохранён в проект <b>${label}</b>!<br><div style="font-size:12px; color:#4ade80; margin-top:6px;">🚀 Теперь можно переходить в другой чат и нажимать <b>«Подхватить»</b>!</div>`;
+        setTimeout(() => window.close(), 3500);
       } else {
-        captureStatus.innerHTML = `❌ Ошибка n8n: HTTP ${res.status}`;
+        const msg = (data && data.message) ? `: ${data.message}` : ` (HTTP ${status})`;
+        captureStatus.innerHTML = `❌ Ошибка n8n${msg}`;
       }
     })
     .catch(err => {

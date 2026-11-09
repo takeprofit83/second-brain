@@ -10,7 +10,7 @@ project_id: "nastya"
 title: "Проект Настя"
 target_goal: "Персональный проект и рабочее пространство взаимодействия Насти."
 status: "active"
-updated_at: "2026-11-09T20:49:39.393336Z"
+updated_at: "2026-11-09T22:46:04.137887Z"
 state_version: "1.0.0"
 next_step: "Провести первую сессию планирования и сохранить handoff-отчёт."
 confirmed_facts:
@@ -30,8 +30,8 @@ document_links:
   - "Projects/Nastya/"
 artifacts: []
 last_agent: "Antigravity"
-last_log: "20261109-204939-antigravity-03105f7adf8e4a23946998081c924a9c.md"
-next_steps: "Тестирование привязки рабочего WhatsApp"
+last_log: "20261109-224604-antigravity-e6a115efcb9d44c1abbc7486d56c901a.md"
+next_steps: "Тестирование привязки рабочего WhatsApp через QR"
 active_blockers: "None"
 ---
 

@@ -5,15 +5,28 @@ ai_read: true
 project: dzen
 status: active
 last_agent: "Antigravity"
-last_log: "20261119-134911-antigravity-3aa6f1339a9e4143a63d7d04507557b3.md"
-next_steps: "Continue planned operations on dzen channels"
-updated_at: "2026-11-19T13:49:11.579901Z"
+last_log: "20261119-170819-antigravity-631daedde1a5492aad5b49375d998e5b.md"
+next_steps: "Обратная связь от пользователя"
+updated_at: "2026-11-19T17:08:19.359823Z"
 active_blockers: "None"
 ---
 
-# Дзен Автор — актуальный handoff 2026-11-06
+# Дзен Автор — актуальный handoff 2026-11-19
 
 Код `D:\YandexDisk\Content fabric\Dzen`. Читать `AGENTS.md`, верх `CURRENT_STATE.md`, `PROJECT_GUIDE.md` §0 и концептуальный документ `ARCHITECTURE_ZERO_TOUCH_AND_AUTONOMY.md`.
+
+## Инфраструктура: Вывод из эксплуатации Tangerine-VPS и переход на Cloudflare + nikita-vm (2026-11-19)
+
+**СЕРВЕР TANGERINE (195.19.12.38) ПОЛНОСТЬЮ ВЫВЕДЕН ИЗ ЭКСПЛУАТАЦИИ И УДАЛЁН.**
+Деплоить, подключаться по SSH или направлять трафик на старый IP 195.19.12.38 категорически запрещено — хост физически удален.
+Все компоненты проекта теперь работают исключительно на **`nikita-vm` (10.40.40.10)**:
+1. **Лендинг и блог `dzen-author.ru`:** файлы в `/var/www/dzen-landing` на `nikita-vm`, отдаются Docker-контейнером `dzen-landing` наружу через Cloudflare QUIC Tunnel (`cloudflared.service`). Домен обслуживается через NS Cloudflare (`selah.ns.cloudflare.com`, `wesley.ns.cloudflare.com`).
+2. **Менеджер файлов лендинга (FileBrowser):** служба `dzen-landing-files.service` (порт 8788), доступна по `https://dzen-author.ru/files/` и `https://files.dzen-author.ru/`.
+3. **Автосборщик блога (`dzen-blog-build`):** службы `dzen-blog-build.path`, `dzen-blog-build.timer`, `dzen-blog-build.service` на `nikita-vm` запускают `/usr/local/bin/dzen-blog-build.py /var/www/dzen-landing`. При загрузке `.md` через FileBrowser страницы блога, карточки на главной и `sitemap.xml` пересобираются автоматически.
+4. **PodoBot:** служба `podobot-backend.service` (FastAPI порт 8005), база `podobot.db`, воркер Telegram (`podobot-bot.service`) и мост WhatsApp (`whatsapp-bridge.service`) работают на `nikita-vm`.
+5. **Студия «Дзен Автор»:** Next.js порт 3001 (PM2 `dzen-studio`), база PostgreSQL порт 5433. Деплой строго через `deploy.sh` на `nikita-vm`.
+6. **Бэкап:** Полный архив Tangerine (68 МБ) сохранён в `D:\YandexDisk\Atlas\server pem_key\tangerine_full_backup_20261119.tar.gz` и на `nikita-vm:/opt/backups/`.
+
 
 ## Проверенный выкат: Этап 1 Zero-Touch Ops для Стелл, предохранитель и авто-диагностика — 2026-11-06
 
